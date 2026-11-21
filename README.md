@@ -50,7 +50,7 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@0.1.2 invar
+mint install 1amageek/Invar@0.1.3 invar
 invar
 ```
 
@@ -73,14 +73,14 @@ The Invar marketplace ships the skills and starts its MCP server with `invar mcp
 For Codex, run these commands in a terminal.
 
 ```sh
-codex plugin marketplace add 1amageek/Invar --ref 0.1.2
+codex plugin marketplace add 1amageek/Invar --ref 0.1.3
 codex plugin add invar@invar-local
 ```
 
 For Claude Code, use its plugin commands.
 
 ```text
-/plugin marketplace add 1amageek/Invar#0.1.2
+/plugin marketplace add 1amageek/Invar#0.1.3
 /plugin install invar@invar-local
 ```
 
