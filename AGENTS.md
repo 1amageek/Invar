@@ -16,5 +16,6 @@ Apply the global development rules to changes in this repository. Read [PHILOSOP
 
 ## Review behavioral changes
 
-- For changes to workflow entry, execution or publication, verify the affected behavior in the actual CLI/MCP and Explorer paths. For changes across the whole workflow, reproduce a project with no `SPEC.md` or production source, review and verify the written specification before adding code, then exercise the post-implementation gates and confirm that Explorer shows the outcome. Include an incomplete or failed path with the correct return stage.
+- For changes to workflow entry, execution, publication or evidence navigation, verify the affected behavior in the actual CLI/MCP and Explorer paths using the same workspace and snapshot. For changes across the whole workflow, reproduce a project with no `SPEC.md` or production source, review and verify the written specification before adding code, then exercise the post-implementation gates and confirm that Explorer shows the outcome. Include an incomplete or failed path with the correct return stage.
+- When validating a plugin update, check the installed skill and exercise its configured MCP executable in the intended workspace. Record installation, authorized connection and verification execution as separate observations.
 - Report missing behavior explicitly during review. Documentation and skill text define the required behavior. CLI runs, MCP receipts and the Explorer view establish what works in the current build.
