@@ -9,7 +9,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/1amageek/ArchitectureExplorer.git", exact: "0.1.0"),
         .package(url: "https://github.com/1amageek/swift-formal.git", exact: "0.1.0"),
-        .package(url: "https://github.com/1amageek/swift-sdk.git", exact: "0.1.0"),
+        .package(url: "https://github.com/1amageek/swift-sdk.git", exact: "0.14.0"),
     ],
     targets: [
         .target(name: "InvarMap", dependencies: [.product(name: "ArchitectureFrontend", package: "architectureexplorer"), .product(name: "ArchitectureCore", package: "architectureexplorer")], exclude: ["DESIGN.md"]),
