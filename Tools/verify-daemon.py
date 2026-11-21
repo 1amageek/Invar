@@ -12,7 +12,7 @@ import tempfile
 import time
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--binary", default=str(Path(__file__).resolve().parents[1] / ".build/debug/invar"))
+parser.add_argument("--binary", default=str(Path(__file__).resolve().parents[1] / ".build/debug/inver"))
 args = parser.parse_args()
 source = Path(args.binary).resolve()
 checks = []
@@ -31,17 +31,18 @@ with tempfile.TemporaryDirectory(prefix="invar-daemon-runtime-") as directory:
     root = Path(directory).resolve()
     workspace = root / "workspace"
     workspace.mkdir()
-    binary = root / "invar"
+    binary = root / "inver"
     shutil.copy2(source, binary)
+    for bundle in source.parent.glob("*.bundle"):
+        shutil.copytree(bundle, root / bundle.name)
     base = ["--workspace", str(workspace), "--state", str(root / "state")]
     runtime = None
     owned_pid = None
 
     def call(action, *options, expected=0):
         result = subprocess.run([str(binary), "daemon", action, *base, *options], capture_output=True, text=True, timeout=20)
-        value = json.loads(result.stdout)
-        assert result.returncode == expected, (action, result.returncode, value)
-        return value
+        assert result.returncode == expected, (action, result.returncode, result.stdout, result.stderr)
+        return json.loads(result.stdout)
 
     def record():
         return json.loads((runtime / "host-control.json").read_text())
@@ -100,7 +101,7 @@ with tempfile.TemporaryDirectory(prefix="invar-daemon-runtime-") as directory:
             # The private record was produced by this test's child, and the
             # exact workspace is unique. Never stop an unrelated workspace.
             command = subprocess.run(["/bin/ps", "-p", str(owned_pid), "-o", "command="], capture_output=True, text=True, timeout=5).stdout
-            if root.name + "/invar daemon serve" in command and str(workspace) in command:
+            if root.name + "/inver daemon serve" in command and str(workspace) in command:
                 os.kill(owned_pid, signal.SIGKILL)
                 wait_for(lock_free)
         if runtime is not None and runtime.exists() and lock_free():

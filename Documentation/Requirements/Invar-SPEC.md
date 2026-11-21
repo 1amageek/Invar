@@ -371,32 +371,32 @@ Explorerにクリック経由のSchedulerを実装しない。証跡により観
 
 ## 17. CLI・MCP
 
-以下は実装予定契約。実行コマンド名は`invar`に確定しているが、コマンド実装済みを意味しない。
+以下は実装予定契約。実行コマンド名は`inver`に確定しているが、コマンド実装済みを意味しない。
 
 ```bash
 # 支援可能な入力・property・手法を確認
-invar capabilities --workspace . --format json
+inver capabilities
 
 # 構造上の候補と不足情報を列挙（外部テストを走らせない）
-invar discover --workspace . --format json
+inver discover --workspace . --format json
 
 # 実行計画を固定。まだ外部検証を走らせない
-invar plan --workspace . --contracts ./verification.json --out ./plan.json
+inver plan --workspace . --contracts ./verification.json --out ./plan.json
 
 # 明示した計画を実行。承認済みの実行権限を別に確認
-invar run --plan ./plan.json --out ./verification-run
+inver run --plan ./plan.json --out ./verification-run
 
 # 構造更新を購読し、許可した手法だけを差分再実行
-invar watch --workspace . --contracts ./verification.json
+inver watch --workspace . --contracts ./verification.json
 
 # 既存Explorer GUIへ接続／起動し、検証拡張を登録
-invar explore --workspace . --watch
+inver explore --workspace . --watch
 
 # 結果・再現・CI
-invar report --run ./verification-run --format json
-invar replay --evidence <evidence-id>
-invar ci --workspace . --contracts ./verification.json --policy ./verification-policy.json
-invar mcp --workspace .
+inver report --run ./verification-run --format json
+inver replay --evidence <evidence-id>
+inver ci --workspace . --contracts ./verification.json --policy ./verification-policy.json
+inver mcp --workspace .
 ```
 
 命令の成功exitと検証結果を分ける。`discover`／`plan`のexit 0は入力処理・計画作成の成功のみ。`run`は完了状況を返し、`ci`は指定policyに従って判定する。

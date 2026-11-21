@@ -40,4 +40,4 @@ CommandOptions accepts exact protocol-2 client commands, startup capability ceil
 
 The old discover/service/explore frontends, CLI-owned watch loop, preparation helpers and observer tickets are removed with this cutover. Explorer publication occurs through the daemon automatically. Private source/records/formal reads require explicit startup sourceValues; Native execution additionally requires the actual host grant and matching requested capability. Capabilities are fixed per client profile, and a different profile is needed for a different ceiling/engine.
 
-The offline `invar map` entry point delegates explicit source/configuration inputs to [InvarMap](../../InvarMap/DESIGN.md). It never opens a daemon store or admits a verification operation.
+The offline `inver map` entry point delegates explicit source/configuration inputs to [InvarMap](../../InvarMap/DESIGN.md). It never opens a daemon store or admits a verification operation.

@@ -15,7 +15,7 @@ GraphView projections and source.read previews are not full verification inputs.
 
 The user assigned ArchitectureExplorer extension development to that project. Invar does not implement or modify ArchitectureExtensions, registry/session/permissions, ActionIntent dispatch, extension persistence or the Web renderer. The earlier additive input SDK was committed separately as `73ccfe7`. No live user Explorer server is restarted by verification. The current owner aex-1.3 contract requires aex-1.3 negotiation, connection-bound principals and atomic run publications; Invar does not claim compatibility until the owner exposes and verifies that API.
 
-After extension edits began, the mutable development package graph encountered their work-in-progress compile errors. Integration verification uses a private exported copy of ArchitectureExplorer `73ccfe7`, alongside the same local Formal/swift-sdk dependencies. The production Invar Package.swift retains sibling local path references. This evidence does not certify the new extension implementation or its current mutable checkout.
+After extension edits began, the mutable development package graph encountered their work-in-progress compile errors. That earlier integration verification used an exported copy of ArchitectureExplorer `73ccfe7` and local Formal and swift-sdk dependencies. The public package now pins all three upstream repositories and is installed through Mint. The earlier verification applies to the revisions it exercised.
 
 ## Remaining integration gates
 

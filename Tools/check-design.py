@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check local dependency declarations and design links; not behavioral acceptance."""
+"""Check public package dependency declarations and design links."""
 import json
 from pathlib import Path
 import re
@@ -14,15 +14,20 @@ def manifest(path):
   return json.loads(r.stdout)
 try:
  current=manifest(ROOT); assert current['name']=='Invar'
- assert {p['name'] for p in current['products']}=={'VerificationCore','VerificationDiscovery','VerificationPlanner','VerificationStore','VerificationExplorer','VerificationBackends','VerificationRuntime','VerificationClient','VerificationDaemon','VerificationFormal','invar'}
- paths={e['fileSystem'][0]['identity']:Path(e['fileSystem'][0]['path']).resolve() for e in current['dependencies']}
- expected={identity:(ROOT/'..'/folder).resolve() for identity,folder in [('architectureexplorer','ArchitectureExplorer'),('formal','Formal'),('swift-sdk','swift-sdk')]}
- assert paths==expected,(paths,expected)
+ assert {p['name'] for p in current['products']}=={'VerificationCore','VerificationDiscovery','VerificationPlanner','VerificationStore','VerificationExplorer','VerificationBackends','VerificationRuntime','VerificationClient','VerificationDaemon','VerificationFormal','inver'}
+ expected={'architectureexplorer':'ArchitectureExplorer','swift-formal':'swift-formal','swift-sdk':'swift-sdk'}
  dependencies={}
- required={'architectureexplorer':{'ArchitectureCore','ArchitectureIR','ArchitectureClient'},'formal':{'FormalCore','FormalIR','FormalCompiler','FormalValidation','FormalEvidence'},'swift-sdk':{'MCP'}}
- for identity,path in paths.items():
-  products={p['name'] for p in manifest(path)['products']}; assert required[identity]<=products
-  dependencies[identity]={'localPath':'../'+path.name,'requiredProducts':sorted(required[identity])}
+ pins={pin['identity']:pin for pin in json.loads((ROOT/'Package.resolved').read_text())['pins']}
+ for entry in current['dependencies']:
+  assert 'sourceControl' in entry
+  dependency=entry['sourceControl'][0]
+  identity=dependency['identity']
+  location=dependency['location']['remote'][0]['urlString']
+  revision,=dependency['requirement']['revision']
+  assert location==f'https://github.com/1amageek/{expected[identity]}.git'
+  assert pins[identity]['location']==location and pins[identity]['state']['revision']==revision
+  dependencies[identity]=revision
+ assert dependencies.keys()==expected.keys()
  designs=[p for p in ROOT.rglob('DESIGN.md') if not any(part == '.git' or part.startswith('.build') for part in p.parts)]
  for path in designs:
   source=path.read_text()
@@ -46,8 +51,6 @@ try:
    if linked.name=='DESIGN.md' and linked.is_relative_to(ROOT): pending.append(linked)
  assert {p.resolve() for p in designs}<=reached, sorted(str(p) for p in designs if p.resolve() not in reached)
  assert not list((ROOT/'Documentation/Requirements').glob('ArchitectureExplorer-EXTENSIONS*'))
- for filename in ['EXTENSIONS-SPEC.md','EXTENSIONS-API.md']:
-  assert (ROOT/'../ArchitectureExplorer/Documentation'/filename).is_file()
- print(json.dumps({'scope':'Manifest and document structure only; not behavioral acceptance','designFiles':len(designs),'acceptanceIDsMapped':len(identifiers),'localDependencies':dependencies},indent=2))
-except (AssertionError,OSError,ValueError,subprocess.SubprocessError) as error:
+ print(json.dumps({'scope':'Manifest and document structure only; not behavioral acceptance','designFiles':len(designs),'acceptanceIDsMapped':len(identifiers),'pinnedDependencies':dependencies},indent=2))
+except (AssertionError,KeyError,OSError,ValueError,subprocess.SubprocessError) as error:
  print(str(error),file=sys.stderr); sys.exit(1)

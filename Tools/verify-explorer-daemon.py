@@ -17,7 +17,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument("--binary", default=str(ROOT / ".build/debug/invar"))
+parser.add_argument("--binary", default=str(ROOT / ".build/debug/inver"))
 parser.add_argument("--host", default=str(ROOT / "Tests/Fixtures/ExplorerHost/.build/debug/InvarExplorerHost"))
 parser.add_argument("--toolchain", help="Explicit existing pinned Formal toolchain; enables real TLC/Lean worker and read checks")
 parser.add_argument("--native-recovery", action="store_true", help="Kill actual daemon during a journaled native harness and verify physical recovery")

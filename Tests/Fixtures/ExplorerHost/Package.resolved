@@ -1,6 +1,14 @@
 {
-  "originHash" : "949b1219af01cbc03e497d3beae5bfcc826546935a29039ba883b790eb1d37db",
+  "originHash" : "50b9ea9e5a62c402af8325e39ffd6b96b9782f19b900a1165571f9019509bb6c",
   "pins" : [
+    {
+      "identity" : "architectureexplorer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/1amageek/ArchitectureExplorer.git",
+      "state" : {
+        "revision" : "4390dcd21400cb3af37d891a8644c6acde7eef66"
+      }
+    },
     {
       "identity" : "eventsource",
       "kind" : "remoteSourceControl",
@@ -29,6 +37,14 @@
       }
     },
     {
+      "identity" : "swift-formal",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/1amageek/swift-formal.git",
+      "state" : {
+        "revision" : "204f5e71903b7815da9c70fc44ab416ddb0f68c5"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
@@ -44,6 +60,14 @@
       "state" : {
         "revision" : "2f58d8ef84438d6517fc78bcea2f8527e3c72936",
         "version" : "2.105.0"
+      }
+    },
+    {
+      "identity" : "swift-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/1amageek/swift-sdk.git",
+      "state" : {
+        "revision" : "6cdd633b7f782bffba6c2859b28147b2ffa1fc57"
       }
     },
     {
@@ -79,6 +103,15 @@
       "state" : {
         "revision" : "da6fe9beb4f7f67beb75914ca8e0d48ae48d6406",
         "version" : "0.25.10"
+      }
+    },
+    {
+      "identity" : "yams",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpsim/Yams.git",
+      "state" : {
+        "revision" : "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+        "version" : "6.2.2"
       }
     }
   ],

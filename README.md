@@ -73,52 +73,50 @@ flowchart TD
 
 An execution can finish and publish an incomplete report. Check the verdict separately from execution and publication. The report retains checked conditions, model bounds, unsupported production inputs, and review findings. Model generation and regression tests contribute evidence about their own scope. [Support and limits](Documentation/SUPPORT.md) · [Example of a reviewed project run](Verification/ProjectWorkflow-RESULT.md)
 
-## Build and install locally
+## Install with Mint
 
-Use Swift 6.4.1, Python 3, and macOS 27 on Apple Silicon. Place the `ArchitectureExplorer`, `Formal`, and `swift-sdk` checkouts beside Invar. SwiftPM uses the sibling paths declared in `Package.swift`. From the parent directory, clone the four packages with these directory names.
+Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-git clone https://github.com/1amageek/Invar.git Invar
-git clone https://github.com/1amageek/ArchitectureExplorer.git ArchitectureExplorer
-git clone https://github.com/1amageek/swift-formal.git Formal
-git clone https://github.com/1amageek/swift-sdk.git swift-sdk
+mint install 1amageek/Invar@main
+inver capabilities
 ```
 
-From the Invar checkout, build the CLI and prepare a marketplace for your target. Choose a new output directory for the marketplace.
+SwiftPM fetches Architecture Explorer, swift-formal, and the Swift MCP SDK automatically. Run `mint install 1amageek/Invar@main --force` to update an existing installation from `main`.
+
+## Install the agent plugin
+
+The Invar marketplace ships the skills and starts its MCP server with `inver mcp`. Make `inver` available on the agent's `PATH` and open the target project as the agent's working directory.
+
+For Codex, run these commands in a terminal.
 
 ```sh
-python3 ../Formal/Tools/run-with-timeout.py --seconds 180 -- \
-  swift build --build-system native -Xswiftc -target -Xswiftc arm64-apple-macosx27.0
-python3 Tools/prepare-plugin.py --workspace /path/to/target --output /path/to/local-marketplace
-```
-
-The generated MCP configuration uses the absolute path to the executable and workspace. For Codex, run these commands in a terminal.
-
-```sh
-codex plugin marketplace add /path/to/local-marketplace
+codex plugin marketplace add 1amageek/Invar --ref main
 codex plugin add invar@invar-local
 ```
 
 For Claude Code, use its plugin commands.
 
 ```text
-/plugin marketplace add /path/to/local-marketplace
+/plugin marketplace add 1amageek/Invar
 /plugin install invar@invar-local
 ```
 
 For snapshot-bound verification, start the daemon with the policy reviewed for that workspace. The policy authorizes the exact configuration, executables, and capabilities. Start Explorer for the same workspace and authorize the Invar Provider there. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
 
 ```sh
-.build/debug/invar daemon start --workspace /path/to/target --policy /path/to/policy.json
-.build/debug/invar daemon status --workspace /path/to/target
+inver daemon start --workspace /path/to/target --policy /path/to/policy.json
+inver daemon status --workspace /path/to/target
 ```
+
+For development, run `swift build --product inver` from the Invar checkout. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v inver)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/inver`.
 
 ## Generate a Map from the CLI
 
-The offline `invar map` command reads selected Swift packages and writes a generator-owned `ARCHITECTURE.dsl`, with package-owned fragments where needed. Its supported inputs include conventional SwiftPM executable targets with an `@main` entry and supported SwiftWeb configurations. Run it from the target workspace with `invar` on your PATH.
+The offline `inver map` command reads selected Swift packages and writes a generator-owned `ARCHITECTURE.dsl`, with package-owned fragments where needed. Its supported inputs include conventional SwiftPM executable targets with an `@main` entry and supported SwiftWeb configurations. Run it from the target workspace with `inver` on your PATH.
 
 ```sh
-invar map --workspace . --system "Demo" --package . --out ARCHITECTURE.dsl
+inver map --workspace . --system "Demo" --package . --out ARCHITECTURE.dsl
 ```
 
 Repeat `--package` with workspace-relative paths to include multiple packages. The generator records references to the input files and protects existing authored DSL. [Map generator design](Sources/InvarMap/DESIGN.md)

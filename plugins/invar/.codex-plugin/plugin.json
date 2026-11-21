@@ -1,6 +1,6 @@
 {
   "name": "invar",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Run Specification Verification and Implementation Model Verification, track Source-to-Model Validation, and publish reviewed project evidence to Architecture Explorer.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
