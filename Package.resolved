@@ -1,12 +1,13 @@
 {
-  "originHash" : "ec151b8356b06fc28f2859a3a32ec64c0166f4cd74a803ee828931fe3f65ac30",
+  "originHash" : "a2ef63eacad77cc1aab993bbb4534287962c134abaab16adac8c43fdfcc44b87",
   "pins" : [
     {
       "identity" : "architectureexplorer",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/ArchitectureExplorer.git",
       "state" : {
-        "revision" : "4390dcd21400cb3af37d891a8644c6acde7eef66"
+        "revision" : "6fc81990c751d055b487bd0cff51838729b4b2b7",
+        "version" : "0.1.0"
       }
     },
     {
@@ -41,7 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/swift-formal.git",
       "state" : {
-        "revision" : "204f5e71903b7815da9c70fc44ab416ddb0f68c5"
+        "revision" : "204f5e71903b7815da9c70fc44ab416ddb0f68c5",
+        "version" : "0.1.0"
       }
     },
     {
@@ -67,7 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/swift-sdk.git",
       "state" : {
-        "revision" : "6cdd633b7f782bffba6c2859b28147b2ffa1fc57"
+        "revision" : "c427312446d3ccff3a210bc227a2ea418cd570c3",
+        "version" : "0.1.0"
       }
     },
     {
@@ -75,7 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/swift-skeleton.git",
       "state" : {
-        "revision" : "fb10ef666a30e892b9f3a4ca0740702c6c621d80"
+        "revision" : "1215a3bd86d172e07151c7ccc9a213cb6ea27434",
+        "version" : "0.5.0"
       }
     },
     {

@@ -23,10 +23,10 @@ try:
   dependency=entry['sourceControl'][0]
   identity=dependency['identity']
   location=dependency['location']['remote'][0]['urlString']
-  revision,=dependency['requirement']['revision']
+  version,=dependency['requirement']['exact']
   assert location==f'https://github.com/1amageek/{expected[identity]}.git'
-  assert pins[identity]['location']==location and pins[identity]['state']['revision']==revision
-  dependencies[identity]=revision
+  assert pins[identity]['location']==location and pins[identity]['state']['version']==version=='0.1.0'
+  dependencies[identity]=version
  assert dependencies.keys()==expected.keys()
  designs=[p for p in ROOT.rglob('DESIGN.md') if not any(part == '.git' or part.startswith('.build') for part in p.parts)]
  for path in designs:

@@ -8,3 +8,6 @@ __pycache__/
 
 # Machine-local verification output
 /Verification/**/*.log
+
+# The consumer resolves this repository's published tag.
+/Tests/Fixtures/ExplorerHost/Package.resolved

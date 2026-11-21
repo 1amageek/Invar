@@ -1,5 +1,5 @@
 {
   "name": "invar",
-  "version": "0.5.1",
+  "version": "0.1.0",
   "description": "Run Specification Verification and Implementation Model Verification, track Source-to-Model Validation, and publish reviewed project evidence to Architecture Explorer."
 }

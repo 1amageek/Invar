@@ -78,11 +78,11 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@main
+mint install 1amageek/Invar@0.1.0
 inver capabilities
 ```
 
-SwiftPM fetches Architecture Explorer, swift-formal, and the Swift MCP SDK automatically. Run `mint install 1amageek/Invar@main --force` to update an existing installation from `main`.
+SwiftPM fetches Architecture Explorer, swift-formal, and the Swift MCP SDK automatically. To install a different release, use its version after `@`.
 
 ## Install the agent plugin
 
@@ -91,14 +91,14 @@ The Invar marketplace ships the skills and starts its MCP server with `inver mcp
 For Codex, run these commands in a terminal.
 
 ```sh
-codex plugin marketplace add 1amageek/Invar --ref main
+codex plugin marketplace add 1amageek/Invar --ref 0.1.0
 codex plugin add invar@invar-local
 ```
 
 For Claude Code, use its plugin commands.
 
 ```text
-/plugin marketplace add 1amageek/Invar
+/plugin marketplace add 1amageek/Invar#0.1.0
 /plugin install invar@invar-local
 ```
 
