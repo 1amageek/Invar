@@ -371,35 +371,7 @@ Explorerにクリック経由のSchedulerを実装しない。証跡により観
 
 ## 17. CLI・MCP
 
-以下は実装予定契約。実行コマンド名は`inver`に確定しているが、コマンド実装済みを意味しない。
-
-```bash
-# 支援可能な入力・property・手法を確認
-inver capabilities
-
-# 構造上の候補と不足情報を列挙（外部テストを走らせない）
-inver discover --workspace . --format json
-
-# 実行計画を固定。まだ外部検証を走らせない
-inver plan --workspace . --contracts ./verification.json --out ./plan.json
-
-# 明示した計画を実行。承認済みの実行権限を別に確認
-inver run --plan ./plan.json --out ./verification-run
-
-# 構造更新を購読し、許可した手法だけを差分再実行
-inver watch --workspace . --contracts ./verification.json
-
-# 既存Explorer GUIへ接続／起動し、検証拡張を登録
-inver explore --workspace . --watch
-
-# 結果・再現・CI
-inver report --run ./verification-run --format json
-inver replay --evidence <evidence-id>
-inver ci --workspace . --contracts ./verification.json --policy ./verification-policy.json
-inver mcp --workspace .
-```
-
-命令の成功exitと検証結果を分ける。`discover`／`plan`のexit 0は入力処理・計画作成の成功のみ。`run`は完了状況を返し、`ci`は指定policyに従って判定する。
+The `invar` executable uses `--workspace` when supplied. By default it locates the containing Git checkout or worktree from the current directory. It shows the resolved workspace, starts its local daemon and opens Explorer. Agent clients run `invar mcp` for the same workspace without opening a browser. Automatic activation requires an existing policy and respects explicit stop. See the [CLI startup contract](../../Sources/invar/Commands/DESIGN.md#workspace-startup).
 
 | 終了code案 | 意味 |
 |---:|---|

@@ -10,7 +10,7 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--workspace", type=Path, required=True)
-parser.add_argument("--binary", type=Path, default=root / ".build/debug/inver")
+parser.add_argument("--binary", type=Path, default=root / ".build/debug/invar")
 parser.add_argument("--state", type=Path, help="Existing private daemon store when using a non-default location")
 parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()

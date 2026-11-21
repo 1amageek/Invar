@@ -15,9 +15,6 @@ struct CommandDriver {
         defer { await client.shutdown() }
         let result: (Data,Int32)
         switch options.command {
-        case "status":
-            let value = try await client.status()
-            result = (try Canonical.encode(value),0)
         case "current":
             let value = try await client.currentView()
             result = (try Canonical.encode(value),0)

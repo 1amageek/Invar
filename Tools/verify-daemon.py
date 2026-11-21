@@ -12,7 +12,7 @@ import tempfile
 import time
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--binary", default=str(Path(__file__).resolve().parents[1] / ".build/debug/inver"))
+parser.add_argument("--binary", default=str(Path(__file__).resolve().parents[1] / ".build/debug/invar"))
 args = parser.parse_args()
 source = Path(args.binary).resolve()
 checks = []
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix="invar-daemon-runtime-") as directory:
     root = Path(directory).resolve()
     workspace = root / "workspace"
     workspace.mkdir()
-    binary = root / "inver"
+    binary = root / "invar"
     shutil.copy2(source, binary)
     for bundle in source.parent.glob("*.bundle"):
         shutil.copytree(bundle, root / bundle.name)
@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix="invar-daemon-runtime-") as directory:
             # The private record was produced by this test's child, and the
             # exact workspace is unique. Never stop an unrelated workspace.
             command = subprocess.run(["/bin/ps", "-p", str(owned_pid), "-o", "command="], capture_output=True, text=True, timeout=5).stdout
-            if root.name + "/inver daemon serve" in command and str(workspace) in command:
+            if root.name + "/invar daemon serve" in command and str(workspace) in command:
                 os.kill(owned_pid, signal.SIGKILL)
                 wait_for(lock_free)
         if runtime is not None and runtime.exists() and lock_free():

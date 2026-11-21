@@ -37,13 +37,21 @@ public actor WorkspaceDaemon: VerificationDaemonServing, DaemonHostControlling {
         do {
             let files = DaemonPrivateFiles(paths: configuration.paths)
             if !configuration.explicitStart, FileManager.default.fileExists(atPath: configuration.paths.stopLatch.path) { throw InvarError("USER_STOPPED","Explicit user stop prevents automatic activation",exitCode: 6) }
+            if !configuration.explicitStart,
+                !FileManager.default.fileExists(atPath: configuration.paths.stateDirectory.appendingPathComponent("verification.sqlite").path) {
+                throw InvarError("APPROVAL_REQUIRED", "Start Invar and configure the workspace policy before automatic activation", exitCode: 8)
+            }
             let store = try SQLiteVerificationStore(root: configuration.paths.stateDirectory,policy: configuration.storePolicy)
             self.store = store
             try files.prepare(explicitStart: configuration.explicitStart)
             let engine = try ExecutionIdentity.current(executable: configuration.executable), epoch = UUID().uuidString
             self.epoch = epoch; engineIdentity = engine
-            try await store.activateEpoch(epoch,engineIdentity: engine)
             var policy = try await store.loadPolicy()
+            if !configuration.explicitStart {
+                guard let policy else { throw InvarError("APPROVAL_REQUIRED", "Automatic activation requires a stored workspace policy", exitCode: 8) }
+                guard policy.engineIdentity == engine else { throw InvarError("EXECUTOR_MISMATCH", "The stored policy belongs to another Invar engine", exitCode: 8) }
+            }
+            try await store.activateEpoch(epoch,engineIdentity: engine)
             if let initial = configuration.initialPolicy {
                 guard initial.engineIdentity == engine else { throw InvarError("EXECUTOR_MISMATCH","Initial host policy names another engine") }
                 if let policy { guard initial == policy else { throw InvarError("REVISION_CONFLICT","Use host.policy.apply to change an existing policy") } }

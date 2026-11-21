@@ -4,8 +4,9 @@ import VerificationCore
 struct CommandOptions: Sendable {
     let command: String
     let values: [String:String]
+    let workspace: URL
     init(_ arguments: [String]) throws {
-        let commands: Set<String> = ["capabilities","status","change-open","change-seal","change","change-revision","plan","plan-info","run","ci","report","replay","operation","receipt","cancel","watch","watch-stop","watch-status","watches","current","source-status","view","evidence","publication","provider-action","mcp"]
+        let commands: Set<String> = ["capabilities","change-open","change-seal","change","change-revision","plan","plan-info","run","ci","report","replay","operation","receipt","cancel","watch","watch-stop","watch-status","watches","current","source-status","view","evidence","publication","provider-action","mcp"]
         guard let command = arguments.first, commands.contains(command) else { throw InvarError("INVALID_ARGUMENT","Unknown daemon SDK command",exitCode: 2) }
         self.command = command
         let allowed: Set<String> = ["workspace","state","client-state","client-profile","capabilities","contracts","plan","run","change","change-revision","operation-id","action-id","envelope-id","watch-id","view-id","evidence-id","key","wait","out","workers","memory-mib","timeout","run-timeout","processes","cpu-seconds","scratch-mib"]
@@ -17,8 +18,12 @@ struct CommandOptions: Sendable {
         }
         if let wait = values["wait"], !["true","false"].contains(wait) { throw InvarError("INVALID_ARGUMENT","--wait expects true or false",exitCode: 2) }
         self.values = values
+        if command == "capabilities", values["workspace"] == nil {
+            workspace = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        } else {
+            workspace = try WorkspaceSelection.resolve(values["workspace"])
+        }
     }
-    var workspace: URL { URL(fileURLWithPath: values["workspace"] ?? FileManager.default.currentDirectoryPath).standardizedFileURL.resolvingSymlinksInPath() }
     func required(_ key: String) throws -> String {
         guard let value = values[key], !value.isEmpty, value.utf8.count <= 1024 else { throw InvarError("INVALID_ARGUMENT","Missing bounded --" + key,exitCode: 2) }
         return value

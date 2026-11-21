@@ -14,7 +14,7 @@ def manifest(path):
   return json.loads(r.stdout)
 try:
  current=manifest(ROOT); assert current['name']=='Invar'
- assert {p['name'] for p in current['products']}=={'VerificationCore','VerificationDiscovery','VerificationPlanner','VerificationStore','VerificationExplorer','VerificationBackends','VerificationRuntime','VerificationClient','VerificationDaemon','VerificationFormal','inver'}
+ assert {p['name'] for p in current['products']}=={'VerificationCore','VerificationDiscovery','VerificationPlanner','VerificationStore','VerificationExplorer','VerificationBackends','VerificationRuntime','VerificationClient','VerificationDaemon','VerificationFormal','invar'}
  expected={'architectureexplorer':('ArchitectureExplorer','0.1.0'),'swift-formal':('swift-formal','0.1.0'),'swift-sdk':('swift-sdk','0.14.0')}
  dependencies={}
  pins={pin['identity']:pin for pin in json.loads((ROOT/'Package.resolved').read_text())['pins']}

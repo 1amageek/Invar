@@ -51,14 +51,24 @@ Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.c
 
 ```sh
 mint install 1amageek/Invar@0.1.0
-inver capabilities
+invar capabilities
 ```
 
-SwiftPM fetches Architecture Explorer, swift-formal, and the Swift MCP SDK automatically. If you already installed an earlier build of Invar 0.1.0, run `mint install 1amageek/Invar@0.1.0 --force` to rebuild it from the corrected release tag. To install a different release, use its version after `@`.
+SwiftPM resolves the verification libraries and Swift MCP SDK. For the browser, make the paired `architecture` and `architecture-web` executables available from the [Architecture Explorer installation](https://github.com/1amageek/ArchitectureExplorer/tree/0.1.0#quick-start). Install both beside `invar` or place the pair on `PATH`. When developing with the Explorer checkout, set `INVAR_EXPLORER` to the absolute path of its paired `architecture` executable and `ARCHITECTURE_WEB_HELPER` to its matching helper.
+
+From a Git checkout or worktree, including a nested source directory:
+
+```sh
+invar
+invar status
+invar stop
+```
+
+`invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. The plugin runs `invar mcp` in the agent's project directory. MCP shares an existing daemon or starts one for an already configured workspace. Explicit stop holds until the next explicit start.
 
 ## Install the agent plugin
 
-The Invar marketplace ships the skills and starts its MCP server with `inver mcp`. Make `inver` available on the agent's `PATH` and open the target project as the agent's working directory.
+The Invar marketplace ships the skills and starts its MCP server with `invar mcp`. Make `invar` available on the agent's `PATH` and open the target project as the agent's working directory.
 
 For Codex, run these commands in a terminal.
 
@@ -74,21 +84,21 @@ For Claude Code, use its plugin commands.
 /plugin install invar@invar-local
 ```
 
-For snapshot-bound verification, start the daemon with the policy reviewed for that workspace. The policy authorizes the exact configuration, executables, and capabilities. Start Explorer for the same workspace and authorize the Invar Provider there. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
+For snapshot-bound verification, start Invar with the policy reviewed for that workspace and authorize the Invar Provider in Explorer. The policy authorizes the exact configuration, executables, and capabilities. The workspace can open before verification approval. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
 
 ```sh
-inver daemon start --workspace /path/to/target --policy /path/to/policy.json
-inver daemon status --workspace /path/to/target
+invar --workspace /path/to/target --policy /path/to/policy.json
+invar status --workspace /path/to/target
 ```
 
-For development, run `swift build --product inver` from the Invar checkout. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v inver)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/inver`.
+For development, run `swift build --product invar` from the Invar checkout. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v invar)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/invar`.
 
 ## Generate a Map from the CLI
 
-The offline `inver map` command reads selected Swift packages and writes a generator-owned `ARCHITECTURE.dsl`, with package-owned fragments where needed. Its supported inputs include conventional SwiftPM executable targets with an `@main` entry and supported SwiftWeb configurations. Run it from the target workspace with `inver` on your PATH.
+The offline `invar map` command reads selected Swift packages and writes a generator-owned `ARCHITECTURE.dsl`, with package-owned fragments where needed. Its supported inputs include conventional SwiftPM executable targets with an `@main` entry and supported SwiftWeb configurations. Run it from the target workspace with `invar` on your PATH.
 
 ```sh
-inver map --workspace . --system "Demo" --package . --out ARCHITECTURE.dsl
+invar map --workspace . --system "Demo" --package . --out ARCHITECTURE.dsl
 ```
 
 Repeat `--package` with workspace-relative paths to include multiple packages. The generator records references to the input files and protects existing authored DSL. [Map generator design](Sources/InvarMap/DESIGN.md)

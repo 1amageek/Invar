@@ -39,11 +39,33 @@ struct InvarApp {
                 try MapCommand.run(Array(arguments.dropFirst()))
                 return 0
             }
-            if arguments.first == "daemon" {
-                let data = try await DaemonCommand(Array(arguments.dropFirst())).execute()
+            let command = arguments.first
+            if command == "--help" || command == "help" {
+                print("""
+                invar [--workspace PATH] [--policy PATH] [--no-open | --codex-browser]
+                invar status | stop [--workspace PATH]
+                invar mcp [--workspace PATH]
+                invar daemon start | status | stop | approve | identity [--workspace PATH]
+                invar capabilities | map | plan | run | report
+                """)
+                return 0
+            }
+            if command == nil || command?.hasPrefix("--workspace") == true ||
+                ["--policy", "--state", "--no-open", "--codex-browser", "--contracts"].contains(command ?? "") || command == "open" {
+                try await WorkspaceCommand.open(command == "open" ? Array(arguments.dropFirst()) : arguments)
+                return 0
+            }
+            if let command, ["daemon", "status", "stop"].contains(command) {
+                let options = command == "daemon" ? Array(arguments.dropFirst()) : arguments
+                let data = try await DaemonCommand(options).execute()
                 FileHandle.standardOutput.write(data); FileHandle.standardOutput.write(Data([10])); return 0
             }
-            if arguments.first == "mcp" { try await InvarMCP.run(options: CommandOptions(arguments)); return 0 }
+            if command == "mcp" {
+                let options = try CommandOptions(arguments)
+                try await WorkspaceCommand.activateForMCP(options)
+                try await InvarMCP.run(options: options)
+                return 0
+            }
             let data: Data
             if let mode = arguments.first, ["--internal-worker", "--internal-native-build", "--internal-native-verify"].contains(mode) {
                 guard arguments.count == 2 else { throw InvarError("INVALID_ARGUMENT", "Invalid worker invocation", exitCode: 2) }

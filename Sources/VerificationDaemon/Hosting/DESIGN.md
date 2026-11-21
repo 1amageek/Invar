@@ -25,11 +25,11 @@ separate daemon control loop -> status / cancel / drain / recovery
 ## Contracts and Invariants
 A pure model-generation plan uses the existing host verification grant and only the built-in translator. The exact contract approval remains mandatory for every plan containing a configurable checker.
 
-Proposed `VerificationDaemonServing.serve(DaemonConfiguration) async throws` is composed by `inver daemon serve`. `start/status/stop` are administrative client operations. The same executable may host clients, daemon and private worker modes; no second verifier binary is required. Engine identity explicitly binds coordinator/worker code, schemas, Formal resources and tool policies.
+Proposed `VerificationDaemonServing.serve(DaemonConfiguration) async throws` is composed by `invar daemon serve`. `start/status/stop` are administrative client operations. The same executable may host clients, daemon and private worker modes; no second verifier binary is required. Engine identity explicitly binds coordinator/worker code, schemas, Formal resources and tool policies.
 
 Private socket/lock roots use canonical workspace plus OS user identity. An exclusive lock and actual peer identity protect ownership; JSON workspace/PID/name strings alone are not authentication. Daemon issues scoped client credentials after a trusted host policy grants access. Agent labels are descriptive. Read, source/value access, planning, execution and administration are distinct; a payload Bool cannot grant native/Lean execution. Current conversation authorization is not inferred from source comments or logs.
 
-Default daemon lifetime is explicit start to explicit stop. Remove the 600-second idle exit. CLI/MCP connection close cannot end watches, Provider registration or other clients' jobs. Optional client activation starts only the configured local daemon, respects an explicit user-stop latch and grants no new execution authority. Login/system service installation is outside this SDK task.
+The CLI explicitly starts a workspace daemon. An MCP client may activate an existing configuration with a persisted policy if the user-stop latch is absent. Activation grants no new permissions. Once started, the daemon remains resident until explicit stop or process shutdown. CLI/MCP connection close cannot end watches, Provider registration or other clients' jobs.
 
 ```text
 starting -> recovering -> ready / sourceOffline / approvalRequired

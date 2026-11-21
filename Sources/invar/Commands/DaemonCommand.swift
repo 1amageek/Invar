@@ -13,7 +13,8 @@ struct DaemonCommand {
     init(_ arguments: [String]) throws {
         guard let action = arguments.first, ["serve","start","status","stop","approve","identity"].contains(action) else { throw InvarError("INVALID_ARGUMENT","Expected daemon serve/start/status/stop/approve/identity",exitCode: 2) }
         self.action = action
-        let allowed: Set<String> = ["workspace","state","policy","contracts","mode","deadline"]
+        var allowed: Set<String> = ["workspace","state","policy","contracts","mode","deadline"]
+        if action == "serve" { allowed.insert("automatic") }
         var values: [String:String] = [:], index = 1
         while index < arguments.count {
             let key = arguments[index]
@@ -22,12 +23,15 @@ struct DaemonCommand {
         }
         self.values = values
     }
-    func execute() async throws -> Data {
+    func execute(workspace: URL? = nil) async throws -> Data {
         let executable = try InvarApp.executableURL()
-        let workspace = URL(fileURLWithPath: values["workspace"] ?? FileManager.default.currentDirectoryPath)
+        let workspace = try workspace ?? WorkspaceSelection.resolve(values["workspace"])
+        if let mode = values["automatic"], mode != "true" || values["policy"] != nil {
+            throw InvarError("INVALID_ARGUMENT", "Automatic activation needs the existing workspace policy", exitCode: 2)
+        }
         let policy: WorkspacePolicy?
         if ["serve","start","approve"].contains(action), let path = values["policy"] { policy = try readPolicy(URL(fileURLWithPath: path)) } else { policy = nil }
-        let configuration = try DaemonConfiguration(workspace: workspace,executable: executable,stateDirectory: values["state"].map { URL(fileURLWithPath: $0) },initialPolicy: action == "approve" ? nil : policy,defaultConfigurationPath: values["contracts"])
+        let configuration = try DaemonConfiguration(workspace: workspace,executable: executable,stateDirectory: values["state"].map { URL(fileURLWithPath: $0) },initialPolicy: action == "approve" ? nil : policy,explicitStart: values["automatic"] == nil,defaultConfigurationPath: values["contracts"])
         let admin = LocalDaemonAdministration(paths: configuration.paths)
         defer { await admin.shutdown() }
         switch action {

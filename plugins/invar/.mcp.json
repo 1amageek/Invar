@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "invar": {
-      "command": "inver",
+      "command": "invar",
       "args": [
         "mcp",
         "--client-profile",

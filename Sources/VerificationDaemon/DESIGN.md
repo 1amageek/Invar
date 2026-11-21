@@ -23,7 +23,7 @@ Compose the sole workspace execution owner from public Runtime/Store/Explorer/Ba
 
 ## Architecture
 ```text
-inver daemon/worker entry -> VerificationDaemon -> Runtime/Core
+invar daemon/worker entry -> VerificationDaemon -> Runtime/Core
                                             -> Store / Explorer / Backends
 CLI/MCP -> VerificationClient --IPC--> Hosting
 ```
