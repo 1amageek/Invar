@@ -1,6 +1,6 @@
 ---
 name: generate-architecture
-description: Generate or update a repository's ARCHITECTURE.dsl when asked to model its C4 system context and containers from SPEC.md, production code and configuration.
+description: Author or review the repository's ARCHITECTURE.dsl from requirements and design, then reconcile the C4 system context and containers with production code and configuration when available.
 ---
 
 # Generate architecture
@@ -10,8 +10,8 @@ Write the reviewed architecture to the target repository's root `ARCHITECTURE.ds
 ## Reconcile the inputs
 
 1. From the requirements, identify the subject, its purpose, the people or systems that interact with it and the operations they need. Use the specification to establish intent and business roles. If a scope has no applicable specification, record that gap and limit its model to what the implementation and configuration establish. Identify planned requirements separately.
-2. Follow the actual production paths for the selected scope. Trace launch configuration to the executable and composition root, then follow calls, routes, consumers, storage operations and endpoint bindings to their destinations. Inspect the effective environment and infrastructure configuration where ownership or routing depends on it. A library import, directory, test double or unused adapter alone establishes no runtime connection.
-3. Match each proposed element and edge to its evidence. A declared actor can be supported by a requirement and its implemented interface. A reachable call supports a capability; a configured binding supports a configured destination. Claim observed traffic only with runtime evidence. Keep planned-only interactions and unresolved destinations out of the implemented topology. Identify them with their spec or source locations in the result. If a missing input prevents resolving the subject, or evidence conflicts over the same boundary or direction, report the specific gap and preserve the affected existing declarations pending resolution.
+2. Before implementation, author the intended boundary, runtime units, ownership and relationships as a contract. Cite the exact requirements and accepted design decisions. Identify planned elements and relationships in their descriptions. Review the contract and keep its stable identifiers through implementation. Resolve discrepancies against the original requirements; update the contract when the design decision itself changes.
+3. When implementation exists, trace launch configuration to the executable and composition root, then follow calls, routes, consumers, storage operations and endpoint bindings. Cite the production paths and effective configuration that substantiate the contract. Preserve the distinction between planned, implemented and observed relationships. Report any discrepancy or unresolved input with its owning requirement, declaration or source location for review.
 
 ## Write and check the model
 

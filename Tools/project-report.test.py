@@ -22,6 +22,7 @@ class ProjectReportTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.specification = self.write('SPEC.md', '## Acceptance\n| R01 | Valid result | The result meets the contract |\n| R02 | Boundary | The boundary is preserved |\n')
+        self.architecture = self.write('ARCHITECTURE.dsl', 'workspace {\nmodel {\nsample = softwareSystem "Sample"\n}\n}\n')
         self.log = self.write('checker.log', 'actual controlled checker output')
         self.source = self.write('Code.swift', 'func value() -> Bool { true }')
         self.model = self.write('model.json', '{"model":"controlled test model"}')
@@ -37,7 +38,7 @@ class ProjectReportTests(unittest.TestCase):
                                     'inputs': [self.specification, self.source, self.model, self.obligation], 'outputs': [self.log], 'claims': claims}
         self.receipt = self.receipts['specification']
         self.manifest = {'schemaVersion': 2, 'title': 'Whole project', 'inventory': {'source': self.specification,
-                         'sections': [{'heading': '## Acceptance', 'kind': 'table'}]}, 'receipts': [], 'productionInputs': [self.source],
+                         'sections': [{'heading': '## Acceptance', 'kind': 'table'}]}, 'receipts': [], 'architectureInputs': [self.architecture], 'productionInputs': [self.source],
                          'requirements': [{'id': identity, **{phase: {'claims': [phase + identity]} for phase in module.PHASES}} for identity in ['R01', 'R02']]}
         self.manifest['receipts'] = [self.save_receipt(phase) for phase in module.PHASES]
         self.make_reviews()
@@ -52,8 +53,9 @@ class ProjectReportTests(unittest.TestCase):
     def make_reviews(self):
         self.manifest['reviews'] = []
         for stage in module.STAGES:
+            architecture = self.manifest.get('architectureInputs', []) if stage in {'requirements', 'integration'} else []
             review = {'schemaVersion': 1, 'stage': stage, 'requirements': ['R01', 'R02'], 'decision': 'passed', 'summary': 'Reviewed controlled fixture scope',
-                      'findings': [], 'inputs': [self.specification, *self.manifest['productionInputs'], *self.manifest['receipts'], *self.manifest['reviews']]}
+                      'findings': [], 'inputs': [self.specification, *architecture, *self.manifest['productionInputs'], *self.manifest['receipts'], *self.manifest['reviews']]}
             self.manifest['reviews'].append(self.write(stage + '-review.json', json.dumps(review)))
 
     def update_receipt(self, phase='specification'):
@@ -80,6 +82,37 @@ class ProjectReportTests(unittest.TestCase):
         self.assertEqual(result['outcome'], 'incomplete')
         self.assertEqual(result['workflow']['returnTo'], 'requirements')
         self.assertEqual([stage['status'] for stage in result['workflow']['stages']], ['incomplete', 'blocked', 'blocked', 'blocked', 'blocked'])
+
+    def test_missing_architecture_blocks_requirements_even_with_complete_formal_evidence(self):
+        self.manifest.pop('architectureInputs')
+        self.make_reviews()
+        (self.root / 'ARCHITECTURE.dsl').unlink()
+        result = self.build()
+        self.assertEqual(result['outcome'], 'incomplete')
+        self.assertEqual(result['workflow']['returnTo'], 'requirements')
+        self.assertIn('ARCHITECTURE.dsl', ' '.join(result['workflow']['stages'][0]['reasons']))
+
+    def test_integration_review_must_bind_the_architecture_even_when_requirements_pass(self):
+        self.update_review('integration', lambda review: review['inputs'].remove(self.architecture))
+        result = self.build()
+        self.assertEqual(result['workflow']['returnTo'], 'integration')
+        self.assertEqual(result['workflow']['stages'][0]['status'], 'passed')
+        self.assertEqual(result['outcome'], 'incomplete')
+
+    def test_revised_contract_invalidates_the_old_review(self):
+        self.manifest['architectureInputs'] = [self.write('ARCHITECTURE.dsl', 'workspace "Changed" {\nmodel {\n}\n}\n')]
+        with self.assertRaisesRegex(ValueError, 'Changed evidence input: ARCHITECTURE.dsl'):
+            self.build()
+
+    def test_included_declarations_must_be_recorded_and_bound_in_reviews(self):
+        contract = self.write('ARCHITECTURE.dsl', 'workspace {\nmodel {\n!include "subject.dsl"\n}\n}\n')
+        fragment = self.write('subject.dsl', 'sample = softwareSystem "Sample"\n')
+        self.manifest['architectureInputs'] = [contract]
+        with self.assertRaisesRegex(ValueError, 'unbound architecture declaration: subject.dsl'):
+            self.build()
+        self.manifest['architectureInputs'].append(fragment)
+        self.make_reviews()
+        self.assertEqual(self.build()['outcome'], 'passed')
 
     def test_generation_command_cannot_supply_passed_formal_claims(self):
         self.receipts['implementation']['command'] = ['formal', 'translate', '--draft-unvalidated']

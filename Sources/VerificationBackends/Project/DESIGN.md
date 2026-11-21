@@ -37,6 +37,8 @@ requirements -> specification -> implementation -> correspondence -> integration
 
 A workflow emits one JSON summary naming a repository-relative receipt manifest and the configured report. The pinned Invar report builder independently rebuilds the report from the manifest and validates the complete acceptance inventory and receipt hashes. Input mutation, absent/empty evidence, exit/verdict disagreement and output escape fail explicitly. Only exact complete coverage across specification, implementation and validated correspondence can be passed. Incomplete and failed reports remain displayable results.
 
+Architecture declarations are accepted as exact references from the captured workspace, including before production code exists. The requirements and integration reviews bind those declarations. ProjectBackend rejects references to documents created or changed by the workflow in its private attempt. The archive retains the declarations. The integration review owns the comparison with actual implementation and configuration.
+
 ## State, Ownership, and Lifecycle
 
 The attempt owns its writable workspace, process journal and report artifact. Scheduler timeout/cancellation kills its owned process session. Recovery uses the existing native-processes journal. The immutable input root and live repository are not modified. A separate project-evidence/1 artifact retains the validated receipt closure, specifications, source inputs and checker logs beyond attempt cleanup. The publisher consumes a project-report/1 JSON artifact and preserves all verdict fields; it does not reinterpret incomplete as success.

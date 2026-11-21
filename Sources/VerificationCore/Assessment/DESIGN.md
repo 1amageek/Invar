@@ -24,6 +24,8 @@ Preserve exact input identity, separate execution/property/domain/translation/ap
 
 ProjectReportAssessment consumes schema-2 reports under the [project evidence contract](../../../plugins/invar/references/project-verification.md). It recomputes claim outcomes, declared production coverage and the ordered reviewed gates through the invocation-local ProjectWorkflowAssessment helper. Absent claims, inconsistent source/model bindings, incomplete reviews or gate/verdict disagreement cannot establish whole-project success. Raw receipt and review-file integrity belongs to the pinned builder at the [Project execution boundary](../../VerificationBackends/Project/DESIGN.md); native consistency checking does not certify arbitrary checker producers.
 
+The requirements gate needs a root architecture declaration. Native assessment checks exact architecture references against the inputs of the requirements and integration reviews, in addition to the report builder's other review bindings.
+
 ## State, Ownership, and Lifecycle
 Invocation-local values or module-owned actors; no shared mutable global or target-specific synchronization. Active resource owners provide explicit shutdown/cleanup.
 

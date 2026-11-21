@@ -10,7 +10,7 @@ import VerificationStore
 
 @Suite(.timeLimit(.minutes(1))) struct ProjectVerificationTests {
     let builder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("plugins/invar/scripts/project_report.py")
-    func fixture(mutate: Bool = false,delay: Bool = false,stage: ProjectCheck.Stage? = nil) throws -> (URL,BackendContext) {
+    func fixture(mutate: Bool = false,delay: Bool = false,stage: ProjectCheck.Stage? = nil,sourceFree: Bool = false,writeArchitectureDuringExecution: Bool = false) throws -> (URL,BackendContext) {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("invar-project-" + UUID().uuidString)
         let input = root.appendingPathComponent("input"), output = root.appendingPathComponent("output")
         try FileManager.default.createDirectory(at: input,withIntermediateDirectories: true)
@@ -21,10 +21,19 @@ import VerificationStore
         root=Path.cwd(); run=root/'Verification/Project/runs/test'; run.mkdir(parents=True)
         def ref(p):
             return {'path':str(p.relative_to(root)), 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()}
+        architecture=root/'ARCHITECTURE.dsl'; source=root/'Code.swift'
+        \(writeArchitectureDuringExecution ? "architecture.write_text('workspace {}')" : "")
+        architecture_inputs=[ref(architecture)] if architecture.exists() else []
+        production=[ref(source)] if source.exists() else []
         log=run/'checker.log'; log.write_text('asserted arithmetic fixture: 1 + 1 == 2')
-        receipt={'schemaVersion':2,'activity':'specificationCheck','command':['fixture-checker'],'executed':True,'exitCode':0,'inputs':[ref(root/'Code.swift'),ref(root/'SPEC.md')], 'outputs':[ref(log)],'claims':[{'id':'spec','requirements':['A01'],'domain':'specification.lean.quantified','outcome':'passed','scope':'Orchestration fixture only','method':'proof','obligations':[{**ref(root/'SPEC.md'),'selector':'A01'}]}]}
+        receipt={'schemaVersion':2,'activity':'specificationCheck','command':['fixture-checker'],'executed':True,'exitCode':0,'inputs':[ref(root/'SPEC.md')], 'outputs':[ref(log)],'claims':[{'id':'spec','requirements':['A01'],'domain':'specification.lean.quantified','outcome':'passed','scope':'Orchestration fixture only','method':'proof','obligations':[{**ref(root/'SPEC.md'),'selector':'A01'}]}]}
         r=run/'receipt.json';r.write_text(json.dumps(receipt))
-        manifest={'schemaVersion':2,'title':'Fixture verification','productionInputs':[ref(root/'Code.swift')],'reviews':[],'inventory':{'source':ref(root/'SPEC.md'),'sections':[{'heading':'## Acceptance','kind':'table'}]},'requirements':[{'id':'A01','specification':{'claims':['spec']},'implementation':{'claims':[],'reason':'No source check'},'correspondence':{'claims':[],'reason':'No validated translation'}}],'receipts':[ref(r)]}
+        reviews=[]
+        for stage, evidence in [('requirements',architecture_inputs),('specification',[ref(r)])]:
+            p=run/(stage+'-review.json')
+            p.write_text(json.dumps({'schemaVersion':1,'stage':stage,'requirements':['A01'],'decision':'passed','summary':'Checked fixture scope','inputs':[ref(root/'SPEC.md'),*evidence],'findings':[]}))
+            reviews.append(ref(p))
+        manifest={'schemaVersion':2,'title':'Fixture verification','productionInputs':production,'architectureInputs':architecture_inputs,'reviews':reviews,'inventory':{'source':ref(root/'SPEC.md'),'sections':[{'heading':'## Acceptance','kind':'table'}]},'requirements':[{'id':'A01','specification':{'claims':['spec']},'implementation':{'claims':[],'reason':'No source check'},'correspondence':{'claims':[],'reason':'No validated translation'}}],'receipts':[ref(r)]}
         m=run/'manifest.json';m.write_text(json.dumps(manifest))
         import importlib.util
         spec=importlib.util.spec_from_file_location('builder',\(String(reflecting: builder.path)));mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
@@ -33,7 +42,10 @@ import VerificationStore
         print(json.dumps({'manifest':str(m.relative_to(root)), 'report':str(report.relative_to(root))}))
         raise SystemExit(6)
         """
-        let files = ["check.py":Data(script.utf8),"SPEC.md":Data("## Acceptance\n| A01 | Addition | Returns two |\n".utf8),"Code.swift":Data("func add() -> Int { 1 + 1 }\n".utf8)]
+        var files = ["check.py":Data(script.utf8),"SPEC.md":Data("## Acceptance\n| A01 | Addition | Returns two |\n".utf8)]
+        if sourceFree {
+            if !writeArchitectureDuringExecution { files["ARCHITECTURE.dsl"] = Data("workspace {\nmodel {\nfixture = softwareSystem \"Fixture\"\n}\n}\n".utf8) }
+        } else { files["Code.swift"] = Data("func add() -> Int { 1 + 1 }\n".utf8) }
         for (path,bytes) in files { try bytes.write(to: input.appendingPathComponent(path)) }
         let entries = files.map { InputEntry(path: $0.key,digest: Canonical.digest($0.value),byteCount: $0.value.count) }.sorted { $0.path < $1.path }
         let budget = RunBudget(memoryMiB: 1024,timeoutSeconds: delay ? 0.2 : 15,runTimeoutSeconds: 30,maximumCPUSeconds: 15)
@@ -68,6 +80,24 @@ import VerificationStore
         do { _ = try await ProjectBackend().execute(context); Issue.record("Production source was accepted in the greenfield phase") }
         catch let error as InvarError { #expect(error.code == "GREENFIELD_SOURCE_PRESENT") }
         #expect(!FileManager.default.fileExists(atPath: context.outputRoot.path))
+    }
+    @Test func greenfieldChecksRetainTheReviewedArchitectureWithoutProductionCode() async throws {
+        let (root,context) = try fixture(stage: .greenfieldSpecification,sourceFree: true)
+        defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
+        let evidence = try await ProjectBackend().execute(context)
+        #expect(evidence.execution == "completed" && evidence.outcome == "unknown")
+        let report = try Data(contentsOf: context.outputRoot.appendingPathComponent("native/validated-report.json"))
+        let document = try #require(JSONSerialization.jsonObject(with: report) as? [String:Any])
+        let metadata = try #require(document["metadata"] as? [String:Any])
+        let verification = try #require(metadata["verificationReport"] as? [String:Any])
+        let workflow = try #require(verification["workflow"] as? [String:Any])
+        #expect(workflow["returnTo"] as? String == "implementation")
+    }
+    @Test func checkerCannotCreateItsOwnArchitectureContract() async throws {
+        let (root,context) = try fixture(stage: .greenfieldSpecification,sourceFree: true,writeArchitectureDuringExecution: true)
+        defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
+        do { _ = try await ProjectBackend().execute(context); Issue.record("Unsealed architecture was accepted") }
+        catch let error as InvarError { #expect(error.code == "INPUT_MISMATCH") }
     }
     @Test func changedReceiptsCannotBecomeAResult() async throws {
         let (root,context) = try fixture(mutate: true); defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }

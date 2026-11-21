@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import posixpath
 import re
 
 PHASES = ('specification', 'implementation', 'correspondence')
@@ -50,6 +51,44 @@ def reference_set(root, values):
     return keys
 
 
+def architecture_references(root, values):
+    references = reference_set(root, values)
+    if not references:
+        return references
+    by_path = {item['path']: item for item in values}
+    entry = 'ARCHITECTURE.dsl'
+    if entry not in by_path or len(by_path) != len(references) or len(by_path) > 256:
+        raise ValueError('Architecture inputs require the reviewed root ARCHITECTURE.dsl and its local DSL fragments')
+    pending = [(entry, 1)]
+    visited = set()
+    total = 0
+    while pending:
+        path, depth = pending.pop()
+        if depth > 32:
+            raise ValueError('Architecture include depth exceeds the Map capture budget')
+        if path in visited or path not in by_path:
+            raise ValueError('Repeated or unbound architecture declaration: ' + path)
+        visited.add(path)
+        data = read(root, by_path[path])
+        total += len(data)
+        content = data.decode('utf-8')
+        if total > 512 * 1024 or not content.strip():
+            raise ValueError('Architecture inputs must contain nonempty UTF-8 DSL within the Map capture budget')
+        for line in content.splitlines():
+            statement = line.strip()
+            if not statement.startswith('!include'):
+                continue
+            include = re.fullmatch(r'!include[ \t]+(?:"([^"]+)"|([^\s"]+))(?:[ \t]+(?://|#).*)?', statement)
+            child = (include[1] or include[2]) if include else ''
+            if child.startswith('/') or ':' in child or '\\' in child or not child.endswith('.dsl'):
+                raise ValueError('Expected a local architecture include in ' + path)
+            relative = posixpath.normpath(posixpath.join(posixpath.dirname(path), child))
+            pending.append((relative, depth + 1))
+    if visited != set(by_path):
+        raise ValueError('Architecture inputs contain unrelated declarations')
+    return references
+
+
 def checked_claim(root, claim, receipt, production):
     activity = receipt['activity']
     if claim.get('method') not in ACTIVITIES[activity]:
@@ -79,7 +118,7 @@ def checked_claim(root, claim, receipt, production):
             raise ValueError('Passed claim lacks exact production-source/model bindings')
 
 
-def workflow(root, manifest, rows, claims, receipts, production):
+def workflow(root, manifest, rows, claims, receipts, production, architecture):
     ids = {row['id'] for row in rows}
     base = {key(manifest['inventory']['source'])} | {key(value) for value in manifest.get('governingDocuments', [])}
     reviews, occupied, requested = [], set(), []
@@ -97,6 +136,8 @@ def workflow(root, manifest, rows, claims, receipts, production):
             occupied.add(pair)
         basis = reference_set(root, review.get('inputs'))
         needed = set(base)
+        if stage in {'requirements', 'integration'}:
+            needed |= architecture
         if stage in {'implementation', 'correspondence', 'integration'}:
             needed |= production
         phases = PHASES if stage == 'integration' else ('implementation', 'correspondence') if stage == 'correspondence' else (stage,)
@@ -124,7 +165,7 @@ def workflow(root, manifest, rows, claims, receipts, production):
                 coverage |= {key(value) for value in claim.get('sourceInputs', [])}
     missing_sources = production - coverage
     outcomes = {phase: aggregate([row[phase]['outcome'] for row in rows]) for phase in PHASES}
-    evidence = {'requirements': 'passed', **outcomes, 'integration': aggregate(list(outcomes.values()))}
+    evidence = {'requirements': 'passed' if architecture else 'notVerified', **outcomes, 'integration': aggregate(list(outcomes.values()))}
     if not production or missing_sources:
         evidence['implementation'] = 'unknown' if evidence['implementation'] == 'passed' else evidence['implementation']
         evidence['integration'] = 'unknown' if evidence['integration'] == 'passed' else evidence['integration']
@@ -144,6 +185,8 @@ def workflow(root, manifest, rows, claims, receipts, production):
             reasons.append('Current passed review missing for ' + str(len(missing)) + ' requirements.')
         if evidence[stage] != 'passed':
             reasons.append('Required evidence is ' + evidence[stage] + '.')
+        if stage == 'requirements' and not architecture:
+            reasons.append('Create and review the root ARCHITECTURE.dsl alongside SPEC.md.')
         if stage == 'implementation' and (not production or missing_sources):
             reasons.append('Declared production inputs are empty or not completely covered by implementation checks.')
         if stage in requested:
@@ -205,6 +248,8 @@ def build(root, manifest):
         raise ValueError('Requirements differ from the complete acceptance inventory')
     for reference in manifest.get('governingDocuments', []):
         read(root, reference)
+    architecture_inputs = manifest.get('architectureInputs', [])
+    architecture = architecture_references(root, architecture_inputs)
     production = reference_set(root, manifest.get('productionInputs'))
 
     claims = {}
@@ -282,7 +327,7 @@ def build(root, manifest):
             passed = sum(row[phase]['outcome'] == 'passed' for row in group['requirements'])
             edges.append({'id': identity + '-' + phase, 'source': identity, 'target': phase, 'role': phase, 'directed': True,
                           'label': str(passed) + '/' + str(len(group['requirements'])) + ' verified'})
-    gates = workflow(root, manifest, rows, claims, receipts, production)
+    gates = workflow(root, manifest, rows, claims, receipts, production, architecture)
     verdict = gates['outcome']
     for index, stage in enumerate(gates['stages']):
         identity = 'workflow-' + stage['id']
@@ -294,7 +339,8 @@ def build(root, manifest):
     document = {'schemaVersion': '1', 'kind': 'proofDependencies', 'title': manifest['title'], 'nodes': nodes, 'edges': edges,
                 'metadata': {'verificationReport': {'schemaVersion': 2, 'inventory': [entry['id'] for entry in expected],
                     'requirements': rows, 'evidence': list(claims.values()), 'receipts': receipts, 'outcome': verdict,
-                    'workflow': gates, 'productionInputs': manifest['productionInputs'], 'mapBinding': manifest.get('mapBinding'), 'openQuestions': []}}}
+                    'workflow': gates, 'architectureInputs': architecture_inputs, 'productionInputs': manifest['productionInputs'],
+                    'mapBinding': manifest.get('mapBinding'), 'openQuestions': []}}}
     return document
 
 

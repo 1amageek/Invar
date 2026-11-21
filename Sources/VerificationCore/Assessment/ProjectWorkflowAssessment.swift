@@ -7,8 +7,14 @@ enum ProjectWorkflowAssessment {
         guard let workflow = report["workflow"] as? [String:Any], workflow["schemaVersion"] as? Int == 1,
             let stages = workflow["stages"] as? [[String:Any]], stages.compactMap({ $0["id"] as? String }) == order,
             let reviews = workflow["reviews"] as? [[String:Any]], reviews.count <= inventory.count * order.count,
+            let architecture = report["architectureInputs"] as? [[String:Any]],
             workflow["productionInputCount"] as? Int == production.count,
             workflow["coveredProductionInputCount"] as? Int == production.intersection(covered).count else { throw ProjectReportAssessment.invalid("Project workflow omits reviewed gates or production coverage") }
+        let architectureKeys = try ProjectReportAssessment.referenceKeys(architecture)
+        let architecturePaths = Set(architecture.compactMap { $0["path"] as? String })
+        guard architecture.isEmpty || architecturePaths.contains("ARCHITECTURE.dsl") && architecturePaths.count == architecture.count && architecturePaths.allSatisfy({ $0.hasSuffix(".dsl") }) else {
+            throw ProjectReportAssessment.invalid("Architecture inputs omit the root ARCHITECTURE.dsl or contain invalid fragments")
+        }
         var accepted = Dictionary(uniqueKeysWithValues: order.map { ($0,Set<String>()) }), occupied = Set<String>(), requested = Set<String>()
         for review in reviews {
             guard review["schemaVersion"] as? Int == 1, let stage = review["stage"] as? String, order.contains(stage),
@@ -17,7 +23,11 @@ enum ProjectWorkflowAssessment {
                 let summary = review["summary"] as? String, !summary.isEmpty, let findings = review["findings"] as? [[String:Any]],
                 let reference = review["reference"] as? [String:Any], let inputs = review["inputs"] as? [[String:Any]], !inputs.isEmpty,
                 let complete = review["bindingComplete"] as? Bool else { throw ProjectReportAssessment.invalid("Stage review lacks a current evidence binding") }
-            _ = try ProjectReportAssessment.referenceKey(reference); _ = try ProjectReportAssessment.referenceKeys(inputs)
+            _ = try ProjectReportAssessment.referenceKey(reference)
+            let inputKeys = try ProjectReportAssessment.referenceKeys(inputs)
+            if complete, stage == "requirements" || stage == "integration" {
+                guard architectureKeys.isSubset(of: inputKeys) else { throw ProjectReportAssessment.invalid("Review omits the exact architecture inputs") }
+            }
             for id in requirements { guard occupied.insert(stage + "\0" + id).inserted else { throw ProjectReportAssessment.invalid("Ambiguous overlapping stage reviews") } }
             guard decision != "passed" || findings.isEmpty, decision != "changesRequested" || !findings.isEmpty else { throw ProjectReportAssessment.invalid("Review decision and findings disagree") }
             for finding in findings {
@@ -30,7 +40,8 @@ enum ProjectWorkflowAssessment {
         }
         let phaseOutcomes = ProjectReportAssessment.phases.map { ProjectReportAssessment.aggregate(phaseValues[$0]!) }
         var evidence = Dictionary(uniqueKeysWithValues: zip(ProjectReportAssessment.phases,phaseOutcomes))
-        evidence["requirements"] = "passed"; evidence["integration"] = ProjectReportAssessment.aggregate(phaseOutcomes)
+        evidence["requirements"] = architecture.isEmpty ? "notVerified" : "passed"
+        evidence["integration"] = ProjectReportAssessment.aggregate(phaseOutcomes)
         if production.isEmpty || !production.isSubset(of: covered) {
             for id in ["implementation","integration"] where evidence[id] == "passed" { evidence[id] = "unknown" }
         }

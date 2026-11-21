@@ -8,6 +8,8 @@ The target repository owns the manifest, governing specifications, production in
 
 Each requirement has three assessments. The field names identify their stages in the manifest and report.
 
+`architectureInputs` records exact path/SHA-256 references for root `ARCHITECTURE.dsl` and any local DSL fragments it uses. Supply the root even when the project has zero production sources. Absent architecture is incomplete at requirements. The approved run checks the references against its sealed inputs. The requirements review binds the architecture design and its validation. The integration review binds those declaration bytes plus production and relevant configuration references and reviews their correspondence. Specification checker receipts remain independently reusable when their requirements and model inputs have not changed.
+
 | Field | Verification stage |
 |---|---|
 | `specification` | Specification Verification |
@@ -56,4 +58,4 @@ A selected C4 subject owns Verification/Project/invar.json beside its declaratio
 
 Agent MCP uses invar_plan with that configuration and budget, then invar_run with the returned plan/snapshot/subject. The session needs approved planning, verification, nativeExecution and userLeanExecution capabilities. Read the original operation, report and publication to completion. Reopening a report or reconnecting a client does not authorize a replacement execution.
 
-Use the Explorer Workspace entity as the project subject when the project has no C4 model. A starting workspace needs a reviewed `SPEC.md` and approved model/checker inputs to execute Specification Verification. The optional `project.stage` value `greenfieldSpecification` requires a sealed input with no Swift or Rust sources and an empty production inventory in its report. After the independent evidence and specification review pass, integrate those receipts with a new implementation snapshot. The Workspace may show a valid incomplete project report before any production input exists.
+Use the Explorer Workspace entity as the project subject when starting a new project. Specification Verification uses a reviewed `SPEC.md` and `ARCHITECTURE.dsl` together with approved model/checker inputs. The optional `project.stage` value `greenfieldSpecification` requires a sealed input with no Swift or Rust sources and an empty production inventory in its report. After the independent evidence and specification review pass, integrate those receipts with a new implementation snapshot. The Workspace may show a valid incomplete project report before any production input exists.

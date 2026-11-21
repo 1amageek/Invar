@@ -67,13 +67,20 @@ public struct ProjectBackend: VerificationBackend {
         let validated = try FixedInputReader.read(rebuilt,maximum: context.budget.maximumOutputBytes)
         let originalJSON = try JSONSerialization.jsonObject(with: report) as? NSDictionary
         let validatedJSON = try JSONSerialization.jsonObject(with: validated) as? NSDictionary
+        let document = try JSONDecoder().decode(JSONValue.self, from: validated)
+        let verificationReport = document["metadata"]["verificationReport"]
         if check.stage == .greenfieldSpecification {
-            let document = try JSONDecoder().decode(JSONValue.self, from: validated)
-            guard document["metadata"]["verificationReport"]["workflow"]["productionInputCount"].int == 0 else {
+            guard verificationReport["workflow"]["productionInputCount"].int == 0 else {
                 throw InvarError("INVALID_RESULT", "A greenfield specification report must have an empty production inventory")
             }
         }
         let outcome = try ProjectReportAssessment.outcome(validated)
+        let capturedDigests = Dictionary(uniqueKeysWithValues: context.job.inputs.map { ($0.path, $0.digest) })
+        for reference in verificationReport["architectureInputs"].array {
+            guard let path = reference["path"].string, let digest = reference["sha256"].string, capturedDigests[path] == digest else {
+                throw InvarError("INPUT_MISMATCH", "Architecture declarations must belong to the captured workspace")
+            }
+        }
         let expected: Int32 = outcome == "passed" ? 0 : outcome == "failed" ? 5 : 6
         guard originalJSON != nil, originalJSON == validatedJSON, result.exitCode == expected, validation.exitCode == expected else { throw InvarError("INVALID_RESULT","Project report, receipts and process exit disagree") }
         for entry in context.job.inputs {

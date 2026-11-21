@@ -6,10 +6,10 @@ Invar makes verification part of building software. The developer and the Agent 
 
 | Stage | What the developer and Agent establish | What advances the workflow |
 | --- | --- | --- |
-| Requirements and design | Write or update the governing `SPEC.md`, including expected behavior, failure cases, constraints and acceptance conditions. Document user interaction in `DESIGN.md` where it applies. | A reviewed specification with identifiable requirements and verification obligations. |
+| Requirements and design | Write the governing `SPEC.md` and author any missing root `ARCHITECTURE.dsl`. Document user interaction in `DESIGN.md` where it applies. | Reviewed behavior and architecture contracts with identifiable requirements and verification obligations. |
 | Specification Verification | Derive formal conditions from `SPEC.md`. Use TLA+ for transitions, concurrency and related properties, and Lean for invariants and mathematical contracts as applicable. Run the actual checkers through Invar before writing the affected production implementation. | Checker evidence for the required obligations and a review that the formalization expresses the user's requirements. |
 | Implementation and tests | Implement the reviewed contract and exercise its actual user-facing and production execution paths. | Passing tests within their stated scope and implementation review. |
-| Integration verification | Use swift-formal to derive models from the exact production inputs. Run **Implementation Model Verification** against the reviewed conditions and perform **Source-to-Model Validation** for the behaviors claimed. Integrate the evidence per requirement. | Current, reviewed evidence for each required assessment and a whole-project verdict derived by Invar. |
+| Integration verification | Review actual production code and configuration against `ARCHITECTURE.dsl`. Run **Implementation Model Verification** and **Source-to-Model Validation** for the claimed behaviors. | Reviewed architecture reconciliation and current evidence for each required assessment support the verdict derived by Invar. |
 
 Review every stage before advancing. A wrong requirement returns to requirements and design. A wrong formalization returns to specification verification. A code defect returns to implementation. A correspondence defect returns to the owner of the transformation or validation. Preserve prior evidence and rerun dependent checks whose inputs or assumptions changed.
 
