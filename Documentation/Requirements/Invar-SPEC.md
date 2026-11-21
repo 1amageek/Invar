@@ -371,7 +371,7 @@ Explorerにクリック経由のSchedulerを実装しない。証跡により観
 
 ## 17. CLI・MCP
 
-The `invar` executable uses `--workspace` when supplied. By default it locates the containing Git checkout or worktree from the current directory. It shows the resolved workspace, starts its local daemon and opens Explorer. Agent clients run `invar mcp` for the same workspace without opening a browser. Automatic activation requires an existing policy and respects explicit stop. See the [CLI startup contract](../../Sources/invar/Commands/DESIGN.md#workspace-startup).
+The `invar` executable uses `--workspace` when supplied. By default it locates the containing Git checkout or worktree from the current directory. It shows the resolved workspace, starts the bundled Explorer index and the local verification daemon, and opens Explorer. A Mint installation of Invar includes the Explorer host and browser assets. Startup uses those installed resources and does not require a separately installed Explorer, a runtime download, or a source checkout. Agent clients run `invar mcp` for the same workspace without opening a browser. Automatic activation requires an existing policy and respects explicit stop. See the [CLI startup contract](../../Sources/invar/Commands/DESIGN.md#workspace-startup).
 
 | 終了code案 | 意味 |
 |---:|---|
@@ -457,7 +457,7 @@ Invar/
 └── PROGRESS.md
 ```
 
-下位依存はアダプターへ限定する。rootにswift-webは加えず、ExplorerのWeb helperと宣言的拡張を使う。専用Web Appが後で必要なら別Packageで合成する。
+The Explorer package owns its host, Web dependencies and UI assets. Invar includes the Explorer host as an installation resource and communicates with it through the public client and extension contracts.
 
 最初に依存revision、公開API、resources、toolchain、ライセンスを固定する。ArchitectureExplorerは今回の基礎仕様時点で実装未確認のため、存在しない公開製品や統合成功を仮定しない。
 

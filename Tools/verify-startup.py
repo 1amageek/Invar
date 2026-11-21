@@ -2,22 +2,32 @@
 """Check the installed CLI's workspace selection and shared MCP lifecycle."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import http.cookiejar
 import json
 import os
 from pathlib import Path
 import select
+import shutil
 import signal
 import subprocess
 import tempfile
 import time
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--binary', type=Path, default=Path(__file__).resolve().parents[1] / '.build/debug/invar')
-parser.add_argument('--explorer', type=Path, required=True)
 args = parser.parse_args()
 binary = str(args.binary.resolve())
-explorer = str(args.explorer.resolve())
-environment = os.environ | {'INVAR_EXPLORER': explorer}
+resources = Path(binary).parent / 'Invar_invar.bundle'
+explorer = next((root / 'architecture-host' for root in (resources / 'Contents/Resources', resources)
+                 if (root / 'architecture-host').is_file()), None)
+assert explorer, f'Explorer is not bundled beside {binary}'
+for module in ('ArchitectureGraph', 'ArchitectureWeb', 'ArchitectureHTTPHost'):
+    assert list(explorer.parent.glob(f'ArchitectureExplorer_{module}*.bundle')), module
+environment = os.environ | {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+                            'INVAR_EXPLORER': '/no-external-explorer'}
 
 
 def invoke(argv, cwd, expected=0):
@@ -59,16 +69,70 @@ def mcp_status(argv, cwd):
             process.wait(timeout=5)
 
 
+def verify_browser(nested, state, workspace_id):
+    process = subprocess.Popen([binary, '--no-open', *state], cwd=nested, env=environment, text=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        assert select.select([process.stdout], [], [], 35)[0], 'Bundled browser never became ready'
+        line = process.stdout.readline()
+        assert line, process.stderr.read()
+        launch = json.loads(line)
+        assert launch['workspaceID'] == workspace_id
+        parts = urlsplit(launch['url'])
+        assert parts.hostname == '127.0.0.1'
+        origin = f'{parts.scheme}://{parts.netloc}'
+        endpoint = origin + '/api?method=workspace.status'
+        opener = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        with opener.open(origin + '/', timeout=5) as response:
+            assert b'Architecture Explorer' in response.read()
+        with opener.open(origin + '/assets/explorer.js', timeout=5) as response:
+            assert len(response.read()) > 1000
+        try:
+            opener.open(endpoint, timeout=5).close()
+            raise AssertionError('Unauthenticated access to the index succeeded')
+        except HTTPError as error:
+            assert error.code == 403
+            error.close()
+        authentication = Request(origin + '/session', json.dumps({'token': parts.fragment.split('=', 1)[1]}).encode(),
+                                 headers={'Origin': origin, 'Content-Type': 'application/json'})
+        with opener.open(authentication, timeout=5) as response:
+            assert response.status == 200
+        deadline = time.monotonic() + 8
+        while True:
+            with opener.open(endpoint, timeout=5) as response:
+                status = json.load(response)
+            if status.get('snapshotID') and status.get('entityCount', 0) > 0:
+                break
+            assert time.monotonic() < deadline, status
+            time.sleep(0.05)
+        invar_status = invoke([binary, 'status', *state], nested)
+        assert invar_status['workspaceID'] == workspace_id
+        assert invar_status['state'] == 'approvalRequired' and invar_status['policyRevision'] == 0
+        return invar_status['epoch']
+    finally:
+        process.terminate()
+        try:
+            assert process.wait(timeout=8) == 130
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+            raise
+
+
 with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     root = Path(temporary).resolve()
     workspace = root / 'project'
     nested = workspace / 'Sources' / 'Core'
     nested.mkdir(parents=True)
     subprocess.run(['/usr/bin/git', 'init', '--quiet', str(workspace)], check=True, timeout=8)
+    (nested / 'Fixture.swift').write_text('public func answer() -> Int { 42 }\n')
     state = ['--state', str(root / 'state')]
     profiles = ['--client-state', str(root / 'clients'), '--capabilities', 'read']
     mcp = [binary, 'mcp', *state, *profiles]
     assert invoke([binary, 'status', *state], root, 2)['code'] == 'WORKSPACE_REQUIRED'
+    incomplete_install = root / 'invar-without-bundle'
+    shutil.copy2(binary, incomplete_install)
+    assert invoke([incomplete_install, '--no-open', *state], nested, 3)['code'] == 'EXPLORER_UNAVAILABLE'
     identity = invoke([binary, 'daemon', 'identity', *state], nested)
     explicit = invoke([binary, 'daemon', 'identity', '--workspace', str(nested), *state], workspace)
     assert explicit['workspaceID'] != identity['workspaceID']
@@ -92,8 +156,17 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
         'maximumEnvelopeSeconds': 60,
     }))
     owned = False
+    index_socket = Path("/tmp") / f"ae-{os.getuid()}-{identity['workspaceID'][-24:]}" / "rpc.sock"
     runtime = Path('/tmp') / f"invar-{os.getuid()}-{identity['workspaceID'][-24:]}"
     try:
+        browser_epoch = verify_browser(nested, state, identity['workspaceID'])
+        assert invoke([binary, 'status', *state], nested)['epoch'] == browser_epoch
+        invoke([binary, 'stop', '--deadline', '2', *state], nested)
+        subprocess.run([explorer, 'stop', '--workspace', str(workspace)], env=environment, check=True, timeout=8)
+        deadline = time.monotonic() + 8
+        while index_socket.exists():
+            assert time.monotonic() < deadline, 'The bundled index did not release its socket'
+            time.sleep(0.05)
         start = [binary, 'daemon', 'start', '--policy', str(policy), *state]
         with ThreadPoolExecutor(max_workers=2) as executor:
             statuses = [future.result() for future in [executor.submit(invoke, start, nested) for _ in range(2)]]
@@ -110,16 +183,17 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
             assert time.monotonic() < deadline, 'The owned daemon did not shut down'
             time.sleep(0.05)
         recovered = mcp_status(mcp + ['--client-profile', 'automatic'], nested)
+        assert index_socket.exists()
         assert recovered['epoch'] != first['epoch']
         assert recovered['workspaceID'] == identity['workspaceID']
-        assert invoke([explorer, 'daemon', 'status', '--workspace', str(workspace)], nested)['workspaceID'] == recovered['workspaceID']
         assert invoke([binary, 'stop', '--deadline', '2', *state], nested)['stopped']
         owned = False
         assert invoke(mcp, nested, 6)['code'] == 'USER_STOPPED'
         assert invoke([binary, 'status', *state], nested, 6)['code'] == 'DAEMON_UNAVAILABLE'
     finally:
-        if owned:
+        if owned or (runtime / 'host-control.json').exists():
             invoke([binary, 'stop', '--deadline', '2', *state], nested)
-        if subprocess.run([explorer, 'daemon', 'status', '--workspace', str(workspace)], capture_output=True, timeout=5).returncode == 0:
-            invoke([explorer, 'daemon', 'stop', '--workspace', str(workspace)], nested)
-print('Workspace selection, concurrent start, stdio handshake, headless recovery, and explicit stop verified.')
+        result = subprocess.run([explorer, 'stop', '--workspace', str(workspace)], env=environment,
+                                capture_output=True, text=True, timeout=8)
+        assert result.returncode == 0 or 'CONNECTION_FAILED' in result.stderr, result.stderr
+print('Bundled browser and assets, authenticated index, workspace selection, concurrent start, MCP recovery, and explicit stop verified.')

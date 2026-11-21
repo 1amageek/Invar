@@ -9,23 +9,12 @@ struct ExplorerHost {
     let workspace: URL
 
     static func locate(workspace: URL) throws -> Self {
-        let environment = ProcessInfo.processInfo.environment
-        if let configured = environment["INVAR_EXPLORER"] {
-            guard configured.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: configured) else {
-                throw InvarError("EXPLORER_UNAVAILABLE", "INVAR_EXPLORER must name an absolute executable path", exitCode: 3)
-            }
-            return Self(executable: URL(fileURLWithPath: configured).resolvingSymlinksInPath(), workspace: workspace)
+        let bundle = try InvarApp.executableURL().deletingLastPathComponent().appendingPathComponent("Invar_invar.bundle")
+        guard let host = Bundle(url: bundle)?.url(forResource: "architecture-host", withExtension: nil),
+              FileManager.default.isExecutableFile(atPath: host.path) else {
+            throw InvarError("EXPLORER_UNAVAILABLE", "The Invar installation is missing its bundled Explorer host", exitCode: 3)
         }
-        let ownPath = try InvarApp.executableURL()
-        let installed = ownPath.deletingLastPathComponent().appendingPathComponent("architecture")
-        let directories = (environment["PATH"] ?? "").split(separator: ":").filter { $0.hasPrefix("/") }
-        let candidates = [installed] + directories.map { URL(fileURLWithPath: String($0)).appendingPathComponent("architecture") }
-        for candidate in candidates {
-            let resolved = candidate.standardizedFileURL.resolvingSymlinksInPath()
-            guard !resolved.path.hasPrefix(workspace.path + "/"), FileManager.default.isExecutableFile(atPath: resolved.path) else { continue }
-            return Self(executable: resolved, workspace: workspace)
-        }
-        throw InvarError("EXPLORER_UNAVAILABLE", "Install the paired Architecture Explorer commands on PATH, or set INVAR_EXPLORER to the paired CLI", exitCode: 3)
+        return Self(executable: host, workspace: workspace)
     }
 
     static func isIndexRunning(in workspace: URL) async throws -> Bool {
@@ -35,19 +24,18 @@ struct ExplorerHost {
     }
 
     func ensureIndex() async throws {
-        if try await Self.isIndexRunning(in: workspace) { return }
-        try await run(["daemon", "start"], timeout: .seconds(15), output: .standardError)
+        try await run(["start"], timeout: .seconds(25), output: .standardError)
     }
 
     func open(noOpen: Bool, codexBrowser: Bool) async throws {
         let browser = noOpen ? ["--no-open"] : codexBrowser ? ["--codex-browser"] : []
-        try await run(["explore", "--watch"] + browser, timeout: nil, output: .standardOutput)
+        try await run(["browser"] + browser, timeout: nil, output: .standardOutput)
     }
 
     private func run(_ arguments: [String], timeout: Duration?, output: FileHandle) async throws {
         let process = Process()
         process.executableURL = executable
-        process.arguments = arguments + ["--workspace", workspace.path]
+        process.arguments = [arguments[0], "--workspace", workspace.path] + arguments.dropFirst()
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = output
         process.standardError = FileHandle.standardError

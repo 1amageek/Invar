@@ -50,11 +50,11 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@0.1.1
-invar capabilities
+mint install 1amageek/Invar@main invar --force
+invar
 ```
 
-SwiftPM resolves the verification libraries and Swift MCP SDK. For the browser, make the paired `architecture` and `architecture-web` executables available from the [Architecture Explorer installation](https://github.com/1amageek/ArchitectureExplorer/tree/0.1.1#quick-start). Install both beside `invar` or place the pair on `PATH`. When developing with the Explorer checkout, set `INVAR_EXPLORER` to the absolute path of its paired `architecture` executable and `ARCHITECTURE_WEB_HELPER` to its matching helper.
+The Invar installation includes the Architecture Explorer host and browser assets. A single `invar` command starts both workspace services and opens Explorer.
 
 From a Git checkout or worktree, including a nested source directory:
 
