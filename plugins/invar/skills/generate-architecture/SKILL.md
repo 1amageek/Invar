@@ -17,6 +17,8 @@ Write the reviewed architecture to the target repository's root `ARCHITECTURE.ds
 
 Apply the [Structurizr rules](references/structurizr.md) when authoring and reviewing the DSL. Cite each declaration and relationship at the point of use. Reuse the same logical ID across regeneration. Review removed elements and edges against changed inputs and check the complete workspace, including existing declarations outside the edited scope.
 
+For each C2 view, trace where the client app executes, where the backend executes, and which side owns each data store. When a system has both a client app and a separately running backend, declare them in sibling `App` and `Backend` groups within that system. Confirm in the Map that each runtime appears in its declared area and that the client-to-backend interaction crosses the boundary in the declared direction.
+
 Validate the saved root with an available Structurizr parser (with the standalone CLI: `structurizr.sh validate -workspace ARCHITECTURE.dsl`). Separately review the Invar Map rules and follow citations back to the requirement, source or binding that supports each claim. Parser success verifies DSL syntax and model consistency; the evidence review verifies what the graph says. Report the output path, scope, validation performed, and any unresolved or planned facts. State explicitly when parser validation could not run.
 
 Explorer discovers the saved root directly. The optional Swift inventory command, `invar map`, writes to the same root and marks its outputs as generator-owned. When enriching generator output with reviewed requirements, remove the generator signature from the root so a later CLI run protects the authored contract.
