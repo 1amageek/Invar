@@ -157,7 +157,7 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
         let files = WorkspaceContractFiles(workspace: workspace)
         let bytes = try files.read(configurationPath), configuration = try ConfigurationReader.decode(bytes)
         guard let project = configuration.project, project.subjectID == subject, project.approved,
-            configuration.formal.isEmpty, configuration.native.isEmpty, configuration.fuzz.isEmpty, configuration.architecture.isEmpty else { throw InvarError("INVALID_CONFIGURATION","Use a project-only configuration for the selected system/container") }
+            configuration.formal.isEmpty, configuration.native.isEmpty, configuration.fuzz.isEmpty, configuration.architecture.isEmpty else { throw InvarError("INVALID_CONFIGURATION","Use a project-only configuration for the selected workspace, system or container") }
         guard let projectSource = source as? any ProjectArchitectureReading else { throw InvarError("UNSUPPORTED_CAPABILITY","Source adapter cannot capture project inputs") }
         let original = try await projectSource.captureProject(snapshotID: binding.snapshotID,entityID: subject)
         guard original.inventory.snapshotID == binding.snapshotID, original.inventory.workspaceID == binding.workspaceID,

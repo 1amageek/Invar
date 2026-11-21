@@ -1,3 +1,4 @@
+import ArchitectureCore
 import Foundation
 import FormalValidation
 import VerificationCore
@@ -8,6 +9,11 @@ public struct ProjectBackend: VerificationBackend {
     public func execute(_ context: BackendContext) async throws -> VerificationEvidence {
         guard context.nativeExecutionAllowed, let check = context.job.project else { throw InvarError("POLICY_DENIED","Project execution requires a host execution grant") }
         try check.validate()
+        if check.stage == .greenfieldSpecification {
+            guard !context.job.inputs.contains(where: { ["swift", "rs"].contains(URL(fileURLWithPath: $0.path).pathExtension.lowercased()) }) else {
+                throw InvarError("GREENFIELD_SOURCE_PRESENT", "Greenfield Specification Verification requires a snapshot before production source files exist", exitCode: 8)
+            }
+        }
         let started = Canonical.date(), clock = ContinuousClock.now
         let work = context.outputRoot.appendingPathComponent("native"), root = work.appendingPathComponent("workspace")
         let manager = FileManager.default
@@ -61,6 +67,12 @@ public struct ProjectBackend: VerificationBackend {
         let validated = try FixedInputReader.read(rebuilt,maximum: context.budget.maximumOutputBytes)
         let originalJSON = try JSONSerialization.jsonObject(with: report) as? NSDictionary
         let validatedJSON = try JSONSerialization.jsonObject(with: validated) as? NSDictionary
+        if check.stage == .greenfieldSpecification {
+            let document = try JSONDecoder().decode(JSONValue.self, from: validated)
+            guard document["metadata"]["verificationReport"]["workflow"]["productionInputCount"].int == 0 else {
+                throw InvarError("INVALID_RESULT", "A greenfield specification report must have an empty production inventory")
+            }
+        }
         let outcome = try ProjectReportAssessment.outcome(validated)
         let expected: Int32 = outcome == "passed" ? 0 : outcome == "failed" ? 5 : 6
         guard originalJSON != nil, originalJSON == validatedJSON, result.exitCode == expected, validation.exitCode == expected else { throw InvarError("INVALID_RESULT","Project report, receipts and process exit disagree") }

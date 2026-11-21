@@ -52,7 +52,9 @@ public enum ConfigurationReader {
             root[name] = entries
         }
         if let project = root["project"] {
-            guard let fields = project as? [String:Any], Set(fields.keys) == Set(["id","subjectID","command","toolDigests","reportBuilder","report","contracts","budget","approved","required"]) else { throw invalid("Invalid project-command fields") }
+            let required: Set<String> = ["id","subjectID","command","toolDigests","reportBuilder","report","contracts","budget","approved","required"]
+            guard let fields = project as? [String:Any], required.isSubset(of: fields.keys),
+                  Set(fields.keys).subtracting(required).isSubset(of: ["stage"]) else { throw invalid("Invalid project-command fields") }
         }
         let normalized = try JSONSerialization.data(withJSONObject: root)
         let value = try JSONDecoder().decode(VerificationConfiguration.self, from: normalized)

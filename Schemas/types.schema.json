@@ -1333,6 +1333,9 @@
     "project": {
       "type": "object",
       "properties": {
+        "stage": {
+          "const": "greenfieldSpecification"
+        },
         "id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]{1,128}$"

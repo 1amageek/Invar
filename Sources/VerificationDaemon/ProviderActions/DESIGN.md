@@ -45,6 +45,6 @@ ProviderActionTests must exercise the concrete file-backed SDK ledger (duplicate
 
 ## Whole-project dispatch
 
-verify-project carries a repository-relative configuration path and one C4 subject. WorkspaceOperations verifies the original snapshot and configuration subject, seals a project-only plan, and requires exact host contract approval. The existing ProviderAction ledger maps the confirmed action to one verify demand. Native and user Lean execution grants are required before admission. Project jobs use the existing bounded scheduler and private process journal. Publication remains tied to the original subject and manifest.
+verify-project carries a repository-relative configuration path and one Workspace or C4 subject. WorkspaceOperations verifies the original snapshot and configuration subject, seals a project-only plan, and requires exact host contract approval. The existing ProviderAction ledger maps the confirmed action to one verify demand. Native and user Lean execution grants are required before admission. Project jobs use the existing bounded scheduler and private process journal. Publication remains tied to the original subject and manifest.
 
 Explorer menu -> immediate verification destination -> prepare/confirm -> ProviderActions -> sealed project plan -> scheduler/project command -> receipt validation -> original publication. Failure or cancellation never advances a successful verdict.

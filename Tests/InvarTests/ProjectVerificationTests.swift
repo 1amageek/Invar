@@ -10,7 +10,7 @@ import VerificationStore
 
 @Suite(.timeLimit(.minutes(1))) struct ProjectVerificationTests {
     let builder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("plugins/invar/scripts/project_report.py")
-    func fixture(mutate: Bool = false,delay: Bool = false) throws -> (URL,BackendContext) {
+    func fixture(mutate: Bool = false,delay: Bool = false,stage: ProjectCheck.Stage? = nil) throws -> (URL,BackendContext) {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("invar-project-" + UUID().uuidString)
         let input = root.appendingPathComponent("input"), output = root.appendingPathComponent("output")
         try FileManager.default.createDirectory(at: input,withIntermediateDirectories: true)
@@ -39,7 +39,10 @@ import VerificationStore
         let budget = RunBudget(memoryMiB: 1024,timeoutSeconds: delay ? 0.2 : 15,runTimeoutSeconds: 30,maximumCPUSeconds: 15)
         let validBudget = RunBudget(memoryMiB: 1024,timeoutSeconds: 15,runTimeoutSeconds: 30,maximumCPUSeconds: 15)
         let python = "/usr/bin/python3"
-        let check = ProjectCheck(id: "project",subjectID: "system",command: [python,"check.py"],toolDigests: [python:Canonical.digest(try Data(contentsOf: URL(fileURLWithPath: python))),builder.path:Canonical.digest(try Data(contentsOf: builder))],reportBuilder: builder.path,report: "Verification/Project/Report.json",contracts: ["SPEC.md","check.py"],budget: validBudget,approved: true)
+        let check = ProjectCheck(id: "project",subjectID: "system",command: [python,"check.py"],toolDigests: [python:Canonical.digest(try Data(contentsOf: URL(fileURLWithPath: python))),builder.path:Canonical.digest(try Data(contentsOf: builder))],reportBuilder: builder.path,report: "Verification/Project/Report.json",contracts: ["SPEC.md","check.py"],budget: validBudget,approved: true,stage: stage)
+        let configuration = VerificationConfiguration(project: check)
+        let decoded = try ConfigurationReader.decode(try Canonical.encode(configuration))
+        #expect(decoded.project?.stage == stage)
         let inventory = ScopeInventory(workspaceID: "workspace",snapshotID: "snapshot",contextDigest: String(repeating: "c",count: 64),metadata: [:],entities: [],facts: [],coverage: [],inputs: entries)
         let reference = try VerificationInput.reference(inventory)
         let plan = try PlanBuilder().build(inventory: inventory,inputID: reference.id,executorIdentity: String(repeating: "0",count: 64),configuration: VerificationConfiguration(project: check),specifications: [:],toolchains: [:],budget: validBudget)
@@ -58,6 +61,13 @@ import VerificationStore
         #expect(evidence.artifacts.count == 2 && Set(evidence.artifacts.map(\.profile)) == ["project-report/1","project-evidence/1"])
         try PlanValidation.evidence(evidence,job: context.job)
         #expect(try String(contentsOf: context.inputRoot.appendingPathComponent("Code.swift"),encoding: .utf8).contains("1 + 1"))
+    }
+    @Test func greenfieldVerificationRejectsSealedSourceBeforeExecuting() async throws {
+        let (root,context) = try fixture(stage: .greenfieldSpecification)
+        defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
+        do { _ = try await ProjectBackend().execute(context); Issue.record("Production source was accepted in the greenfield phase") }
+        catch let error as InvarError { #expect(error.code == "GREENFIELD_SOURCE_PRESENT") }
+        #expect(!FileManager.default.fileExists(atPath: context.outputRoot.path))
     }
     @Test func changedReceiptsCannotBecomeAResult() async throws {
         let (root,context) = try fixture(mutate: true); defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
