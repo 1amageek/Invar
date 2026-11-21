@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "mode": "local-development",
+  "notALock": true,
+  "dependencies": {
+    "ArchitectureExplorer": {
+      "path": "../ArchitectureExplorer"
+    },
+    "Formal": {
+      "path": "../Formal"
+    },
+    "swift-sdk": {
+      "path": "../swift-sdk"
+    }
+  }
+}

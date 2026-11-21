@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "invar": {
+      "command": "invar",
+      "args": [
+        "mcp",
+        "--client-profile",
+        "verify-project",
+        "--capabilities",
+        "read,planning,verification,nativeExecution,userLeanExecution"
+      ]
+    }
+  }
+}

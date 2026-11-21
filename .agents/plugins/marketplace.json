@@ -1,0 +1,20 @@
+{
+  "name": "invar-local",
+  "interface": {
+    "displayName": "Invar"
+  },
+  "plugins": [
+    {
+      "name": "invar",
+      "source": {
+        "source": "local",
+        "path": "./plugins/invar"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# Current serialized shape schemas
+
+`types.schema.json` owns the schema-2 plan, reference, descriptor, scheduling metadata, evidence, association and run shapes. Configuration payloads independently remain version1; their normalized runtime meaning is owned by ConfigurationReader. ScopeInventory still describes the original manifest sidecar, while the Store input namespace contains only input references. The retired submission/nativeExecutionAllowed/inline backendReport schema is removed.
+
+`python3 Tools/check-schemas.py --store /private/path/verification.sqlite` validates the listed immutable records in read-only mode. It reports the exact checked namespace subset; auth, change, watch and opaque Provider records are validated by their typed Swift owners and behavioral tests, not claimed by this shape checker. SHA identity, fixed authority, reference closure, failure/retention, input/configuration binding and result assessment require runtime verification. JSON Schema is not proof of those contracts.

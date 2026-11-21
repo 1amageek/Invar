@@ -1,0 +1,30 @@
+{
+  "scope": "Manifest and document structure only; not behavioral acceptance",
+  "designFiles": 26,
+  "acceptanceIDsMapped": 48,
+  "localDependencies": {
+    "architectureexplorer": {
+      "localPath": "../ArchitectureExplorer",
+      "requiredProducts": [
+        "ArchitectureClient",
+        "ArchitectureCore",
+        "ArchitectureIR"
+      ]
+    },
+    "formal": {
+      "localPath": "../Formal",
+      "requiredProducts": [
+        "FormalCompiler",
+        "FormalCore",
+        "FormalIR",
+        "FormalValidation"
+      ]
+    },
+    "swift-sdk": {
+      "localPath": "../swift-sdk",
+      "requiredProducts": [
+        "MCP"
+      ]
+    }
+  }
+}

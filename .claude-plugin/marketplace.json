@@ -1,0 +1,13 @@
+{
+  "name": "invar-local",
+  "owner": {
+    "name": "1amageek"
+  },
+  "plugins": [
+    {
+      "name": "invar",
+      "source": "./plugins/invar",
+      "description": "Generate C4 architecture, run Specification Verification and Implementation Model Verification, and track Source-to-Model Validation."
+    }
+  ]
+}

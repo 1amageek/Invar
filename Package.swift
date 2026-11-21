@@ -1,0 +1,26 @@
+// swift-tools-version: 6.4
+import PackageDescription
+
+let modules = ["VerificationCore", "VerificationDiscovery", "VerificationPlanner", "VerificationStore", "VerificationExplorer", "VerificationBackends", "VerificationRuntime", "VerificationClient", "VerificationDaemon", "VerificationFormal"]
+func excludes(_ components: [String]) -> [String] { ["DESIGN.md"] + components.map { $0 + "/DESIGN.md" } }
+let package = Package(
+    name: "Invar", platforms: [.macOS("27.0")],
+    products: modules.map { .library(name: $0, targets: [$0]) } + [.executable(name: "invar", targets: ["invar"])],
+    dependencies: [.package(path: "../ArchitectureExplorer"), .package(path: "../Formal"), .package(path: "../swift-sdk")],
+    targets: [
+        .target(name: "InvarMap", dependencies: [.product(name: "ArchitectureFrontend", package: "architectureexplorer"), .product(name: "ArchitectureCore", package: "architectureexplorer")], exclude: ["DESIGN.md"]),
+        .target(name: "VerificationCore", exclude: excludes(["Domain", "Assessment", "Changes", "Evidence"])),
+        .target(name: "VerificationDiscovery", dependencies: ["VerificationCore"], exclude: excludes(["Rules", "Changes"])),
+        .target(name: "VerificationPlanner", dependencies: ["VerificationCore"], exclude: excludes(["Planning"])),
+        .systemLibrary(name: "CInvarSQLite"),
+        .target(name: "VerificationStore", dependencies: ["VerificationCore", "CInvarSQLite"], exclude: excludes(["Persistence"])),
+        .target(name: "VerificationExplorer", dependencies: ["VerificationCore", .product(name: "ArchitectureFrontend", package: "architectureexplorer"), .product(name: "FormalEvidence", package: "formal"), .product(name: "ArchitectureClient", package: "architectureexplorer"), .product(name: "ArchitectureIR", package: "architectureexplorer"), .product(name: "ArchitectureExtensions", package: "architectureexplorer"), .product(name: "ArchitectureCore", package: "architectureexplorer")], exclude: excludes(["Connection", "Publication"])),
+        .target(name: "VerificationBackends", dependencies: ["VerificationCore", .product(name: "ArchitectureFrontend", package: "architectureexplorer"), .product(name: "ArchitectureCore", package: "architectureexplorer"), .product(name: "FormalCore", package: "formal"), .product(name: "FormalIR", package: "formal"), .product(name: "FormalCompiler", package: "formal"), .product(name: "FormalValidation", package: "formal"), .product(name: "FormalEvidence", package: "formal")], exclude: excludes(["Static", "Formal", "Native", "Artifacts", "Project"])),
+        .target(name: "VerificationRuntime", dependencies: ["VerificationCore"], exclude: excludes(["Scheduling", "Execution", "Coordination", "Watching"])),
+        .target(name: "VerificationFormal", dependencies: ["VerificationCore", .product(name: "FormalEvidence", package: "formal")], exclude: excludes(["Queries"])),
+        .target(name: "VerificationClient", dependencies: ["VerificationCore", "VerificationFormal", .product(name: "ArchitectureClient", package: "architectureexplorer"), .product(name: "FormalEvidence", package: "formal"), .product(name: "ArchitectureCore", package: "architectureexplorer")], exclude: excludes(["Session", "Formal"])),
+        .target(name: "VerificationDaemon", dependencies: ["VerificationCore", "VerificationStore", "VerificationRuntime", "VerificationExplorer", "VerificationBackends", "VerificationDiscovery", "VerificationPlanner", "VerificationFormal", .product(name: "ArchitectureClient", package: "architectureexplorer"), .product(name: "FormalEvidence", package: "formal"), .product(name: "ArchitectureExtensions", package: "architectureexplorer"), .product(name: "FormalValidation", package: "formal"), .product(name: "ArchitectureCore", package: "architectureexplorer")], exclude: excludes(["Hosting", "Workers", "WorkspaceOperations", "FormalQueries", "ProviderActions"])),
+        .executableTarget(name: "invar", dependencies: modules.map { Target.Dependency.target(name: $0) } + ["InvarMap", .product(name: "MCP", package: "swift-sdk"), .product(name: "ArchitectureExtensions", package: "architectureexplorer"), .product(name: "FormalCore", package: "formal"), .product(name: "FormalValidation", package: "formal"), .product(name: "ArchitectureClient", package: "architectureexplorer"), .product(name: "ArchitectureCore", package: "architectureexplorer")], exclude: excludes(["Commands", "MCP"])),
+        .testTarget(name: "InvarTests", dependencies: modules.map { Target.Dependency.target(name: $0) } + ["InvarMap", .product(name: "FormalValidation", package: "formal"), .product(name: "FormalEvidence", package: "formal")]),
+    ], swiftLanguageModes: [.v6]
+)
