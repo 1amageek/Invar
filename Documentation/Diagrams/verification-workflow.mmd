@@ -1,0 +1,8 @@
+flowchart TD
+    Spec["SPEC.md"] --> Requirements["Requirements review"]
+    Requirements --> Specification["Specification Verification · TLA+ and Lean"]
+    Specification --> Implementation["Implementation and tests"]
+    Implementation --> Model["Implementation Model Verification · TLA+ and Lean"]
+    Model --> Correspondence["Source-to-Model Validation"]
+    Correspondence --> Integration["Integration review"]
+    Integration --> Report["Publish the report to Architecture Explorer"]

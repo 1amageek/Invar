@@ -1,0 +1,8 @@
+flowchart TD
+    Specification["Specification Verification evidence"] --> Assessment["Assess each requirement"]
+    Implementation["Implementation Model Verification evidence"] --> Assessment
+    Correspondence["Source-to-Model Validation evidence"] --> Assessment
+    Reviews["Current reviews and production coverage"] --> Assessment
+    Assessment -->|"Required checks and reviews pass"| Passed["Passed"]
+    Assessment -->|"A checked condition fails"| Failed["Failed · Retain the evidence"]
+    Assessment -->|"Required evidence or review is missing"| Incomplete["Incomplete · Show the return stage"]

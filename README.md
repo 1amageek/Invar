@@ -6,16 +6,9 @@ Invar coordinates formal verification for a software workspace. Codex, Claude Co
 
 The two TLA+ and Lean verification stages answer different questions. **Specification Verification** checks an independently authored model of the requirements before implementation. **Implementation Model Verification** checks models generated from supported production code against those requirements after implementation.
 
-```mermaid
-flowchart TD
-    Spec["SPEC.md"] --> Requirements["Requirements review"]
-    Requirements --> Specification["Specification Verification · TLA+ and Lean"]
-    Specification --> Implementation["Implementation and tests"]
-    Implementation --> Model["Implementation Model Verification · TLA+ and Lean"]
-    Model --> Correspondence["Source-to-Model Validation"]
-    Correspondence --> Integration["Integration review"]
-    Integration --> Report["Publish the report to Architecture Explorer"]
-```
+![From SPEC.md through requirements review, specification and implementation checks, source-to-model validation, integration review, and Explorer publication.](Documentation/Diagrams/verification-workflow.svg)
+
+[Mermaid source](Documentation/Diagrams/verification-workflow.mmd)
 
 | Assessment | Input and result |
 |---|---|
@@ -38,38 +31,17 @@ The local Invar plugin bundles four skills and a stdio MCP server for Codex and 
 
 Run the agent in the target workspace. For a snapshot-bound run, start with an indexed Explorer workspace, an authorized Invar connection, and the host-approved configuration for the target. For the Map's **Verify project** action, place `Verification/Project/invar.json` relative to the selected system or container's declaration directory. [Project action contract](plugins/invar/SPEC.md#project-verification-action)
 
-```mermaid
-sequenceDiagram
-    participant Agent as Codex or Claude Code
-    participant Invar as Invar daemon via MCP
-    participant Explorer as Architecture Explorer
-    participant Worker as Approved checker worker
-    Agent->>Invar: Plan verification
-    Invar->>Explorer: Read the pinned snapshot inputs
-    Explorer-->>Invar: Return exact inputs and subject identity
-    Invar-->>Agent: Return the plan and snapshot IDs
-    Agent->>Invar: Submit the run for that plan and subject
-    Invar->>Worker: Execute within the approved budget
-    Worker-->>Invar: Return outcomes and evidence
-    Invar->>Explorer: Publish against the original snapshot and subject
-    Agent->>Invar: Read the original run and publication state
-    Invar-->>Agent: Return the retained report and scope
-```
+![The agent plans a run with Invar, Explorer supplies the pinned inputs, the worker checks them, and Invar publishes and returns the report.](Documentation/Diagrams/agent-verification.svg)
+
+[Mermaid source](Documentation/Diagrams/agent-verification.mmd)
 
 The daemon keeps accepted runs and watches active when an agent disconnects. The default current view follows the acknowledged Explorer head. Per-operation history retains incomplete or failed runs and their original evidence. In the Map, open a report from the system or container's options. On a source node, use **Verify model** or open the result already attached to that node. [Daemon and SDK design](DESIGN.md) · [Evidence delivery](Documentation/EXPLORER-EVIDENCE.md)
 
 ## Read the result
 
-```mermaid
-flowchart TD
-    Specification["Specification Verification evidence"] --> Assessment["Assess each requirement"]
-    Implementation["Implementation Model Verification evidence"] --> Assessment
-    Correspondence["Source-to-Model Validation evidence"] --> Assessment
-    Reviews["Current reviews and production coverage"] --> Assessment
-    Assessment -->|"Required checks and reviews pass"| Passed["Passed"]
-    Assessment -->|"A checked condition fails"| Failed["Failed · Retain the evidence"]
-    Assessment -->|"Required evidence or review is missing"| Incomplete["Incomplete · Show the return stage"]
-```
+![Specification, implementation, correspondence, and coverage evidence lead to a passed, failed, or incomplete result for each requirement.](Documentation/Diagrams/verification-verdict.svg)
+
+[Mermaid source](Documentation/Diagrams/verification-verdict.mmd)
 
 An execution can finish and publish an incomplete report. Check the verdict separately from execution and publication. The report retains checked conditions, model bounds, unsupported production inputs, and review findings. Model generation and regression tests contribute evidence about their own scope. [Support and limits](Documentation/SUPPORT.md) · [Example of a reviewed project run](Verification/ProjectWorkflow-RESULT.md)
 

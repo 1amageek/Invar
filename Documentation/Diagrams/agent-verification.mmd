@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Agent as Codex or Claude Code
+    participant Invar as Invar daemon via MCP
+    participant Explorer as Architecture Explorer
+    participant Worker as Approved checker worker
+    Agent->>Invar: Plan verification
+    Invar->>Explorer: Read the pinned snapshot inputs
+    Explorer-->>Invar: Return exact inputs and subject identity
+    Invar-->>Agent: Return the plan and snapshot IDs
+    Agent->>Invar: Submit the run for that plan and subject
+    Invar->>Worker: Execute within the approved budget
+    Worker-->>Invar: Return outcomes and evidence
+    Invar->>Explorer: Publish against the original snapshot and subject
+    Agent->>Invar: Read the original run and publication state
+    Invar-->>Agent: Return the retained report and scope
