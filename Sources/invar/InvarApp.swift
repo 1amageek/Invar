@@ -25,6 +25,13 @@ struct InvarApp {
         signals.cancel(); await signals.value
         exit(ProcessSignals.interrupted ? 130 : code)
     }
+    static func executableURL() throws -> URL {
+        guard let executable = Bundle.main.executableURL else {
+            throw InvarError("EXECUTOR_UNAVAILABLE", "Cannot locate the running executable")
+        }
+        return executable.resolvingSymlinksInPath()
+    }
+
     private static func execute(_ arguments: [String]) async -> Int32 {
         var code: Int32 = 0
         do {

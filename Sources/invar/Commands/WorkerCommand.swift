@@ -14,7 +14,8 @@ struct WorkerCommand {
         try PlanValidation.descriptor(context.descriptor)
         let descriptorID = try context.descriptor.identity()
         guard descriptorID == context.descriptorID else { throw InvarError("INPUT_MISMATCH","Worker descriptor checksum differs") }
-        let identity = try ExecutionIdentity.current(executable: URL(fileURLWithPath: CommandLine.arguments[0]))
+        let executable = try InvarApp.executableURL()
+        let identity = try ExecutionIdentity.current(executable: executable)
         guard identity == context.executorIdentity else { throw InvarError("EXECUTOR_MISMATCH", "Worker differs from the sealed plan") }
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).standardizedFileURL.resolvingSymlinksInPath()
         guard context.outputRoot.standardizedFileURL.resolvingSymlinksInPath().path == cwd.path else { throw InvarError("INVALID_PLAN", "Worker directory differs") }

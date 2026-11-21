@@ -4,7 +4,7 @@
 Thin executable entry for client commands, MCP relay, daemon serve and private workers. Parent: [Invar](../../DESIGN.md). Target contracts are authoritative for new implementation; current behavior evidence remains in PROGRESS.md. Children are indexed below.
 
 ## Responsibilities and Boundaries
-Thin executable entry for client commands, MCP relay, daemon serve and private workers. CLI/MCP delegate to VerificationClient. Daemon/worker entries delegate to VerificationDaemon. Executable-owned Watching/WorkspaceService and direct Store/planning paths have been removed. Public daemon residency is independent of execution authority.
+Thin executable entry for client commands, MCP relay, daemon serve and private workers. CLI/MCP delegate to VerificationClient. Daemon/worker entries delegate to VerificationDaemon. Executable-owned Watching/WorkspaceService and direct Store/planning paths have been removed. Public daemon residency is independent of execution authority. Daemon and worker identity use the running executable's resolved bundle URL so a PATH invocation or Mint symlink selects the same engine and adjacent resources.
 
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |

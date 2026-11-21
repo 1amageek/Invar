@@ -77,7 +77,7 @@ import FormalEvidence
                 let timeout: Double
                 switch operation {
                 case .preparePlan(_,_,let budget): timeout = budget.runTimeoutSeconds
-                case .verify(let id,_,_): timeout = try await client.plan(id).budget.runTimeoutSeconds
+                case .verify(let id,_,_,_): timeout = try await client.plan(id).budget.runTimeoutSeconds
                 default: timeout = 60
                 }
                 let fixed = try await client.prepare(operation,key: arguments[4],timeout: timeout)

@@ -35,12 +35,19 @@ with tempfile.TemporaryDirectory(prefix="invar-daemon-runtime-") as directory:
     shutil.copy2(source, binary)
     for bundle in source.parent.glob("*.bundle"):
         shutil.copytree(bundle, root / bundle.name)
+    link_directory = root / "bin"
+    link_directory.mkdir()
+    (link_directory / binary.name).symlink_to(binary)
+    environment = os.environ | {"PATH": str(link_directory) + os.pathsep + os.environ["PATH"]}
     base = ["--workspace", str(workspace), "--state", str(root / "state")]
     runtime = None
     owned_pid = None
 
     def call(action, *options, expected=0):
-        result = subprocess.run([str(binary), "daemon", action, *base, *options], capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            [binary.name, "daemon", action, *base, *options], cwd=workspace, env=environment,
+            capture_output=True, text=True, timeout=20,
+        )
         assert result.returncode == expected, (action, result.returncode, result.stdout, result.stderr)
         return json.loads(result.stdout)
 

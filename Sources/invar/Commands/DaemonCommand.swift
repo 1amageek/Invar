@@ -23,7 +23,7 @@ struct DaemonCommand {
         self.values = values
     }
     func execute() async throws -> Data {
-        let executable = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+        let executable = try InvarApp.executableURL()
         let workspace = URL(fileURLWithPath: values["workspace"] ?? FileManager.default.currentDirectoryPath)
         let policy: WorkspacePolicy?
         if ["serve","start","approve"].contains(action), let path = values["policy"] { policy = try readPolicy(URL(fileURLWithPath: path)) } else { policy = nil }
