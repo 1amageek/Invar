@@ -50,11 +50,11 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@0.1.0
+mint install 1amageek/Invar@0.1.1
 invar capabilities
 ```
 
-SwiftPM resolves the verification libraries and Swift MCP SDK. For the browser, make the paired `architecture` and `architecture-web` executables available from the [Architecture Explorer installation](https://github.com/1amageek/ArchitectureExplorer/tree/0.1.0#quick-start). Install both beside `invar` or place the pair on `PATH`. When developing with the Explorer checkout, set `INVAR_EXPLORER` to the absolute path of its paired `architecture` executable and `ARCHITECTURE_WEB_HELPER` to its matching helper.
+SwiftPM resolves the verification libraries and Swift MCP SDK. For the browser, make the paired `architecture` and `architecture-web` executables available from the [Architecture Explorer installation](https://github.com/1amageek/ArchitectureExplorer/tree/0.1.1#quick-start). Install both beside `invar` or place the pair on `PATH`. When developing with the Explorer checkout, set `INVAR_EXPLORER` to the absolute path of its paired `architecture` executable and `ARCHITECTURE_WEB_HELPER` to its matching helper.
 
 From a Git checkout or worktree, including a nested source directory:
 
@@ -73,14 +73,14 @@ The Invar marketplace ships the skills and starts its MCP server with `invar mcp
 For Codex, run these commands in a terminal.
 
 ```sh
-codex plugin marketplace add 1amageek/Invar --ref 0.1.0
+codex plugin marketplace add 1amageek/Invar --ref 0.1.1
 codex plugin add invar@invar-local
 ```
 
 For Claude Code, use its plugin commands.
 
 ```text
-/plugin marketplace add 1amageek/Invar#0.1.0
+/plugin marketplace add 1amageek/Invar#0.1.1
 /plugin install invar@invar-local
 ```
 

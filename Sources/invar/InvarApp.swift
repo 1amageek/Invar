@@ -11,6 +11,7 @@ import FormalCore
 
 @main
 struct InvarApp {
+    static let version = "0.1.1"
     static func main() async {
         let arguments = Array(CommandLine.arguments.dropFirst())
         ProcessSignals.install()
@@ -39,10 +40,15 @@ struct InvarApp {
                 try MapCommand.run(Array(arguments.dropFirst()))
                 return 0
             }
+            if arguments == ["--version"] {
+                print("invar \(Self.version)")
+                return 0
+            }
             let command = arguments.first
             if command == "--help" || command == "help" {
                 print("""
                 invar [--workspace PATH] [--policy PATH] [--no-open | --codex-browser]
+                invar --version
                 invar status | stop [--workspace PATH]
                 invar mcp [--workspace PATH]
                 invar daemon start | status | stop | approve | identity [--workspace PATH]
