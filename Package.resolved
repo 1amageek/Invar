@@ -1,12 +1,12 @@
 {
-  "originHash" : "c2868669c14e9daa26c7cd44cedd3a23385e833813f2f7fb396d75fee7476643",
+  "originHash" : "7a42ffd05add7b3ce0d62429c26263490f2532e82a2058d33042c89a20417116",
   "pins" : [
     {
       "identity" : "architectureexplorer",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/ArchitectureExplorer.git",
       "state" : {
-        "revision" : "18daef310b2da205e0323d9c8e61b224090c2299"
+        "revision" : "09a7c4fcdfc34ab4acc89518732de84a77a1932a"
       }
     },
     {
