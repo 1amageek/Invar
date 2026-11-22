@@ -7,7 +7,7 @@ let package = Package(
     name: "Invar", platforms: [.macOS("27.0")],
     products: modules.map { .library(name: $0, targets: [$0]) } + [.executable(name: "invar", targets: ["invar"])],
     dependencies: [
-        .package(url: "https://github.com/1amageek/ArchitectureExplorer.git", exact: "0.1.3"),
+        .package(url: "https://github.com/1amageek/ArchitectureExplorer.git", revision: "583b879ab59ab7e1049a0f13f65567a994a0b80c"),
         .package(url: "https://github.com/1amageek/swift-formal.git", exact: "0.1.1"),
         .package(url: "https://github.com/1amageek/swift-sdk.git", exact: "0.14.0"),
     ],

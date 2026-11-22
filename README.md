@@ -20,7 +20,7 @@ Review each stage before proceeding. If a review finds a problem, return to the 
 
 ## Run verification from an agent
 
-The local Invar plugin bundles four skills and a stdio MCP server for Codex and Claude Code.
+The local Invar plugin bundles five skills and a stdio MCP server for Codex and Claude Code.
 
 | Skill | Use it to |
 |---|---|
@@ -28,6 +28,7 @@ The local Invar plugin bundles four skills and a stdio MCP server for Codex and 
 | `$verify-spec` | Run scoped **Specification Verification**. Keep authored TLA+ and Lean models under `Verification/Specifications/<subject>/`. [Specification Verification](plugins/invar/skills/verify-spec/SKILL.md) |
 | `$formal-verification` | Run scoped **Implementation Model Verification**. Keep node-level preconditions and expected results in `Verification/<subject>/properties.json`. [Implementation Model Verification](plugins/invar/skills/formal-verification/SKILL.md) |
 | `$generate-architecture` | Inspect requirements, implementation, and configuration to build or update `ARCHITECTURE.dsl` for Explorer's C1 and C2 Map. [Generate Architecture](plugins/invar/skills/generate-architecture/SKILL.md) |
+| `$generate-sequences` | Write or review `SEQUENCES.dsl` for the ordered interactions of a use case in Explorer. [Generate Sequences](plugins/invar/skills/generate-sequences/SKILL.md) |
 
 Run the agent in the target workspace. For a snapshot-bound run, start with an indexed Explorer workspace and the verification configuration for the target. For the Map's **Verify project** action, place `Verification/Project/invar.json` relative to the selected system or container's declaration directory. [Project action contract](plugins/invar/SPEC.md#project-verification-action)
 
