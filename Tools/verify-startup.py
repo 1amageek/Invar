@@ -159,8 +159,12 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
         legacy_record = legacy_resume.read_bytes()
         cold = mcp_status(mcp, nested)
         assert cold['workspaceID'] == identity['workspaceID'] and cold['protocolVersion'] == 3
-        assert legacy_resume.read_bytes() == legacy_record
         browser_epoch = verify_browser(nested, state, identity['workspaceID'])
+        deadline = time.monotonic() + 8
+        while invoke([binary, 'status', *state], nested)['state'] != 'ready':
+            assert time.monotonic() < deadline, 'The bundled Provider did not register'
+            time.sleep(0.05)
+        assert legacy_resume.read_bytes() != legacy_record
         assert invoke([binary, 'status', *state], nested)['epoch'] == browser_epoch == cold['epoch']
         invoke([binary, 'stop', '--deadline', '2', *state], nested)
         subprocess.run([explorer, 'stop', '--workspace', str(workspace)], env=environment, check=True, timeout=8)

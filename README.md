@@ -67,6 +67,8 @@ invar stop
 
 `invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. The plugin runs `invar mcp` in the agent's project directory. MCP shares the workspace daemon or starts it on first use. Explicit stop holds until the next explicit start.
 
+Invar registers automatically with its bundled Explorer for snapshot access and result publication. After replacing an installation, restart the workspace's Invar daemon and Explorer index using the corresponding installations. The new pair registers again and keeps previously published results.
+
 ## Install the agent plugin
 
 The Invar marketplace ships the skills and starts its MCP server with `invar mcp`. Make `invar` available on the agent's `PATH` and open the target project as the agent's working directory.
