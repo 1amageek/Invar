@@ -4,7 +4,7 @@
 Own the daemon's private immutable evidence store and transactional operation ledger. Parent: [Store](../DESIGN.md). No children. Store schema2 is implemented and the daemon is the sole live writer.
 
 ## Responsibilities and Boundaries
-Persist sessions/grants, changes, inputs, obligations/plans, request receipts/run demands, executions/evidence/associations, watches, common view revisions and publication outbox. No access to Explorer SQLite and no reinterpretation of proof results.
+Persist changes, inputs, obligations/plans, request receipts/run demands, executions/evidence/associations, watches, common view revisions and publication outbox. No access to Explorer SQLite and no reinterpretation of proof results.
 
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |
@@ -28,7 +28,7 @@ Typed ports replace the generic namespace/payload repository interface: `ChangeR
 Large input/formal/source/log data is in sealed content-addressed files/indexes, not inline plan/report Data. Blob publication precedes reference commit and is fsynced/atomic. Hash/schema/reference checks apply on reads and writes. Concurrent identical immutable writes converge; conflicting bytes fail. No published reference can point at unfinished/missing content.
 
 ### Quota, pins and pruning
-A persisted StorePolicy owns total logical retained bytes, DB/WAL overhead reserve, file/record counts, staging/scratch reservations, graph-index/page budgets, retention age/count rules and failure/recovery headroom. Defaults are selected from explicit host policy, available resources and measured supported profiles; no new guessed constants are fixed by this design.
+A persisted StorePolicy owns total logical retained bytes, DB/WAL overhead reserve, file/record counts, staging/scratch reservations, graph-index/page budgets, retention age/count rules and failure/recovery headroom. Defaults are selected from the host resource budget, available resources and measured supported profiles; no new guessed constants are fixed by this design.
 
 Reserve worst-case admitted output and failure headroom transactionally before work; charge actual sealed storage and release unused reservation after cleanup. Refuse infeasible admission. Record logical reservations separately from observed physical disk use; outside filesystem activity can still cause I/O failure, which must remain explicit. DB/WAL/checkpoint and recovery costs are part of the budget, not omitted metadata.
 
@@ -59,7 +59,7 @@ Full plan publication atomically publishes its content-bound SchedulingPlan, per
 
 Quota-neutral reopen checks compare the already persisted policy without inserting it again. Releasing owned reservations is cleanup and uses failure headroom, since a failed terminal row can leave page/record counts above the ordinary admission ceiling. Cleanup must remain possible after a correctly recorded publication failure.
 
-Principal-owned ChangeRecord fields and bounded openChanges queries support authorized sealing and overlap detection. capture(reference) materializes only sealed Store input bytes after the caller's admission, rechecking sizes/digests and never falling back to the workspace. adoptPreparation validates a uniquely generated scratch unit before atomically moving/publishing it to the content-keyed prepared root; an already published equal unit converges, different content rejects. Moved bytes retain the producer reservation charge through ownership transfer until plan/result publication and cleanup.
+Change records preserve their originating request and baseline. capture(reference) reads only sealed Store bytes and rechecks sizes and digests.
 
 Retention pin publication validates that its object/visible head exists inside the pin transaction. A reader pins its originating evidence, retaining the full input/artifact dependency closure; concurrent pruning cannot create an admitted reader with a missing evidence binding.
 
@@ -68,9 +68,9 @@ Publication revisions share the records/heads/link transaction owner. completeDe
 
 Source invalidation is a single transaction: advance the uncertain source fence and publish unknown associations for retained evidence before any replacement capture. Later completion must match both fence and confirmation; a late known verdict cannot erase the uncertainty marker. Behavioral owner: StoreLedgerTests.
 
-Watch persistence implements the [Core watch record contract](../../VerificationCore/Evidence/DESIGN.md). Registration checks the retained running demand/envelope, actual persisted principal and current host policy; updates compare fixed authority and CAS revision before advancing one bounded head. Active/paused revisions retain only their declared current references.
+Watch persistence implements the [Core watch contract](../../VerificationCore/Evidence/DESIGN.md). Registration binds the original accepted demand, workspace, configuration and budget. Updates preserve that binding and use an expected revision.
 
-Quiet watch authority checks call authorizeWatch, which reuses the same persisted authority owner as derived envelopes without writing. Verification and reassociation stage issuance share the completed-current-cycle preparation check; an unrelated retained plan cannot bypass preparation.
+Verification and reassociation stage issuance check the completed preparation for the current cycle. Quiet probes append no watch records.
 
 ### Published selection
 commitView owns immutable assessment history only. savePublication(committed) requires a complete envelope and original provider slot/generation, then updates PublishedViewHead in the same transaction if newer. The pointer retains its publication and exact view closure. It is independent of source fences/history sequence and survives reopen; unconfirmed/partial/failed/superseded work cannot select it. latestView returns this confirmed published reference or nil. Internal latestAssessment reads the separate history head for conservative invalidation composition.
@@ -79,7 +79,7 @@ Confirmed observeInput deduplicates by the compact sourceIdentity/epoch rather t
 
 Watch stop/pause entry points own atomic read-and-transition, preserving the latest cycle/pending references. Runtime drains those exact children after admission closure; it does not derive a replacement revision from a stale earlier snapshot.
 
-Provider Action preflight is immutable and size-bounded; scalar revisions retain its original authority/run. Atomic acceptExternalDemand requires that retained mapping and original authenticated envelope, records the concrete SDK job ID, receipt and queued demand together. Recovered gaps are outcomeUnknown and never admitted. Store never grants a first-start permit; only the concrete SDK owner does.
+Provider Action preflight is immutable and size-bounded; scalar revisions retain its original authority/run. Atomic acceptExternalDemand requires that retained mapping and original fixed envelope, records the concrete SDK job ID, receipt and queued demand together. Recovered gaps are outcomeUnknown and never admitted. Store never grants a first-start permit; only the concrete SDK owner does.
 
 Startup reservation recovery runs after physical worker/journal cleanup and before source activation or Coordinator recovery. The host enumerates bounded retained reservations, proves each owned scratch process stopped, then Store.discardAbandonedReservation journals deletion of only runs/<id> or preparing/<id>. It refuses live execution rows or concurrent Store writes. Transferred committed input/preparation/artifact roots are preserved; releasing the abandoned reservation removes only its accounting links. Repeated recovery is idempotent, and unsupported ownership blocks admission.
 

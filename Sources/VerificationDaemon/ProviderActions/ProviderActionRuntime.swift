@@ -11,7 +11,6 @@ actor ProviderActionRuntime: ExternalAdmissionAuthorizing {
     private let operations: WorkspaceOperations
     private let connection: ExplorerProviderConnection
     private let repository: any VerificationRepository
-    private let authentication: any DaemonAuthenticating
     private let coordinator: any ExternalWorkspaceCoordinating
     private let resources: any WorkspaceResourceAdmitting
     private let epoch: String
@@ -21,9 +20,9 @@ actor ProviderActionRuntime: ExternalAdmissionAuthorizing {
     private var pump: Task<Void,Never>?
     private var closed = false
     private var failure: InvarError?
-    init(operations: WorkspaceOperations,connection: ExplorerProviderConnection,repository: any VerificationRepository,authentication: any DaemonAuthenticating,coordinator: any ExternalWorkspaceCoordinating,resources: any WorkspaceResourceAdmitting,epoch: String,retentionSeconds: Double) {
+    init(operations: WorkspaceOperations,connection: ExplorerProviderConnection,repository: any VerificationRepository,coordinator: any ExternalWorkspaceCoordinating,resources: any WorkspaceResourceAdmitting,epoch: String,retentionSeconds: Double) {
         self.operations = operations
-        self.connection = connection; self.repository = repository; self.authentication = authentication; self.coordinator = coordinator; self.resources = resources; self.epoch = epoch; self.retentionSeconds = retentionSeconds
+        self.connection = connection; self.repository = repository; self.coordinator = coordinator; self.resources = resources; self.epoch = epoch; self.retentionSeconds = retentionSeconds
     }
     func start() throws {
         guard pump == nil, !closed else { throw InvarError("INVALID_TRANSITION","Provider Action runtime is already started or closed") }
@@ -64,38 +63,29 @@ actor ProviderActionRuntime: ExternalAdmissionAuthorizing {
     private func preflight(_ intent: ActionIntent,provider: ExtensionProviderClient) async throws -> ProviderActionRegistration {
         guard !closed, permits.count < 32, intent.deadline > Date().timeIntervalSince1970,
             intent.binding.factIDs.isEmpty else { throw InvarError("POLICY_DENIED","Action is expired, scoped differently or admission is closed") }
-        let operation: WorkspaceOperation, input: VerificationInput, originalRun: ExtensionRun?, runRequestID: String, resume: String?
-        var planningGrant: ClientSessionGrant?
+        let operation: WorkspaceOperation, input: VerificationInput, originalRun: ExtensionRun?, runRequestID: String
         switch intent.actionID {
         case "verify-project":
             guard intent.binding.entityIDs.count == 1, let selected = intent.binding.entityIDs.first, let path = intent.arguments["configuration"].string else { throw InvarError("INVALID_REQUEST","Project verification requires one subject and configuration") }
-            let peer = try ConnectionPeer.current()
-            let grants = try await authentication.open(peer: peer,label: "Verify project",requested: [.read,.planning,.verification,.nativeExecution,.userLeanExecution],resumeCredential: nil)
-            let capabilities = Set(grants.session.grants.compactMap(WorkspaceCapability.init(rawValue:)))
-            guard Set<WorkspaceCapability>([.planning,.verification,.nativeExecution,.userLeanExecution]).isSubset(of: capabilities) else { throw InvarError("POLICY_DENIED","Project checking requires planning, verification and explicit code/Lean execution grants") }
             let planID = try await operations.prepareProject(binding: intent.binding,configurationPath: path)
             let plan = try await repository.schedulingPlan(planID)
             input = plan.input
             operation = .verify(planID: planID,changeRevisionID: nil,replayOfRunID: nil,node: VerificationNode(snapshotID: input.snapshotID,entityID: selected))
-            originalRun = nil; runRequestID = intent.requestID; resume = nil; planningGrant = grants
+            originalRun = nil; runRequestID = intent.requestID
         case "verify-model":
             guard intent.binding.entityIDs.count == 1, let selected = intent.binding.entityIDs.first else {
                 throw InvarError("INVALID_REQUEST","Model verification requires one selected source node")
             }
-            let peer = try ConnectionPeer.current()
-            let grants = try await authentication.open(peer: peer,label: "Prepare selected model",requested: [.read,.planning,.verification],resumeCredential: nil)
-            let capabilities = Set(grants.session.grants.compactMap(WorkspaceCapability.init(rawValue:)))
-            guard capabilities.contains(.planning), capabilities.contains(.verification) else { throw InvarError("POLICY_DENIED","Model verification requires planning and verification authority") }
             let planID = try await operations.prepareModel(binding: intent.binding,specification: intent.arguments["specification"].string)
             let plan = try await repository.schedulingPlan(planID)
             input = plan.input
             operation = .verify(planID: planID,changeRevisionID: nil,replayOfRunID: nil,node: VerificationNode(snapshotID: input.snapshotID,entityID: selected))
-            originalRun = nil; runRequestID = intent.requestID; resume = nil; planningGrant = grants
+            originalRun = nil; runRequestID = intent.requestID
         case "verify":
             guard intent.binding.entityIDs.isEmpty, let id = intent.arguments["planID"].string else { throw InvarError("INVALID_REQUEST","Verification requires a sealed plan") }
             let plan = try await repository.schedulingPlan(id)
             input = plan.input; operation = .verify(planID: id,changeRevisionID: intent.arguments["changeRevisionID"].string,replayOfRunID: nil)
-            originalRun = nil; runRequestID = intent.requestID; resume = nil
+            originalRun = nil; runRequestID = intent.requestID
         case "cancel":
             guard let id = intent.arguments["requestID"].string, let parent = try await repository.providerAction(id) else { throw InvarError("ACTION_NOT_FOUND","Cancellation requires an original Provider request") }
             let mapping = try await repository.providerActionState(id)
@@ -103,34 +93,25 @@ actor ProviderActionRuntime: ExternalAdmissionAuthorizing {
             let run = try JSONDecoder().decode(ExtensionRun.self,from: parent.run)
             guard intent.arguments["runID"].string == run.id else { throw InvarError("POLICY_DENIED","Cancellation differs from original source run") }
             input = parent.input; operation = .cancel(demandID: job); originalRun = run; runRequestID = parent.runRequestID
-            resume = try JSONDecoder().decode(String.self,from: parent.authority)
         default: throw InvarError("INVALID_REQUEST","Unknown Provider operation")
         }
         let binding: ExtensionBinding
         if let originalRun { binding = originalRun.binding } else { binding = try await sourceBinding(input,entityIDs: operation.verificationNode.map { [$0.entityID] } ?? []) }
         guard binding == intent.binding else { throw InvarError("INPUT_MISMATCH","Action differs from original sealed source scope") }
-        let grant: ClientSessionGrant
-        if let planningGrant { grant = planningGrant }
-        else {
-            let peer = try ConnectionPeer.current()
-            grant = try await authentication.open(peer: peer,label: "Explorer confirmed action",requested: [.read,.verification,.nativeExecution,.userLeanExecution],resumeCredential: resume)
-        }
-        let capabilities = Set(grant.session.grants.compactMap(WorkspaceCapability.init(rawValue:)))
-        guard capabilities.contains(.verification) else { throw InvarError("POLICY_DENIED","Actual daemon code lacks host verification authority") }
-        _ = try await authentication.authority(principal: grant.session.principal,operation: operation,policyRevision: grant.session.policyRevision,capabilityCeiling: capabilities)
-        guard let policy = try await repository.loadPolicy(), let principal = try await repository.principal(identity: grant.session.principal) else { throw InvarError("POLICY_DENIED","Host authority disappeared during preflight") }
         let now = Date().timeIntervalSince1970
-        let expiry = min(intent.deadline,now+policy.maximumEnvelopeSeconds,principal.expiresAt)
+        let expiry = min(intent.deadline, now + retentionSeconds)
         let fingerprint = try Canonical.identity(operation)
-        let envelope = RequestEnvelope(id: UUID().uuidString,sessionID: grant.session.id,capabilities: Array(capabilities),requestKey: intent.requestID,principal: grant.session.principal,workspaceID: input.workspaceID,fingerprint: fingerprint,operation: operation.name,daemonEpoch: epoch,policyRevision: grant.session.policyRevision,expiresAt: expiry,retainUntil: now+retentionSeconds)
+        let envelope = RequestEnvelope(id: UUID().uuidString,requestKey: "explorer:" + intent.requestID,principal: "local",
+            workspaceID: input.workspaceID,fingerprint: fingerprint,operation: operation.name,
+            daemonEpoch: epoch,expiresAt: expiry,retainUntil: now + retentionSeconds)
         let fixed = try await repository.issueEnvelope(envelope,now: now)
         let run: ExtensionRun
         if let originalRun { try await provider.requireOriginalRun(originalRun); run = originalRun }
         else { run = try await provider.begin(runID: runRequestID,scope: intent.binding.entityIDs.first ?? "workspace",contributionSetID: "verification",binding: intent.binding,kinds: intent.binding.entityIDs.isEmpty ? ["graph"] : ["annotation","graph"],viewIDs: []) }
         guard run.binding == intent.binding, run.providerID == provider.registration.providerID,
             originalRun != nil || !run.committed && run.completion == "pending" else { throw InvarError("INVALID_PUBLICATION","Provider preflight run is inconsistent") }
-        let rawIntent = try CanonicalJSON.encode(intent), authority = try Canonical.encode(grant.resumeCredential), rawRun = try CanonicalJSON.encode(run)
-        let value = ProviderActionRegistration(id: intent.requestID,envelope: fixed,operation: operation,input: input,sourceFingerprint: intent.requestFingerprint,intent: rawIntent,authority: authority,runRequestID: runRequestID,run: rawRun,expiresAt: intent.deadline+3600)
+        let rawIntent = try CanonicalJSON.encode(intent), rawRun = try CanonicalJSON.encode(run)
+        let value = ProviderActionRegistration(id: intent.requestID,envelope: fixed,operation: operation,input: input,sourceFingerprint: intent.requestFingerprint,intent: rawIntent,runRequestID: runRequestID,run: rawRun,expiresAt: intent.deadline+3600)
         try await repository.createProviderAction(value)
         return value
     }

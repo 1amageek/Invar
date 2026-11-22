@@ -10,13 +10,25 @@ import VerificationStore
 
 @Suite(.timeLimit(.minutes(1))) struct ProjectVerificationTests {
     let builder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("plugins/invar/scripts/project_report.py")
-    func fixture(mutate: Bool = false,delay: Bool = false,stage: ProjectCheck.Stage? = nil,sourceFree: Bool = false,writeArchitectureDuringExecution: Bool = false) throws -> (URL,BackendContext) {
+    func fixture(mutate: Bool = false,delay: Bool = false,stage: ProjectCheck.Stage? = nil,sourceFree: Bool = false,writeArchitectureDuringExecution: Bool = false, checkIsolation: Bool = false) throws -> (URL,BackendContext) {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("invar-project-" + UUID().uuidString)
         let input = root.appendingPathComponent("input"), output = root.appendingPathComponent("output")
         try FileManager.default.createDirectory(at: input,withIntermediateDirectories: true)
+        let sentinel = root.appendingPathComponent("outside")
+        if checkIsolation { try Data("intact".utf8).write(to: sentinel) }
+        let isolation = """
+        import socket
+        from pathlib import Path
+        external=Path(\(String(reflecting: sentinel.path)))
+        for operation in (external.read_bytes, lambda: external.write_bytes(b'changed'), lambda: socket.socket().bind(('127.0.0.1', 0))):
+            try: operation()
+            except PermissionError: continue
+            raise RuntimeError('Sandbox accepted access outside the attempt')
+        """
         let script = """
         import json,hashlib,time
         from pathlib import Path
+        \(checkIsolation ? isolation : "")
         \(delay ? "time.sleep(5)" : "")
         root=Path.cwd(); run=root/'Verification/Project/runs/test'; run.mkdir(parents=True)
         def ref(p):
@@ -51,7 +63,7 @@ import VerificationStore
         let budget = RunBudget(memoryMiB: 1024,timeoutSeconds: delay ? 0.2 : 15,runTimeoutSeconds: 30,maximumCPUSeconds: 15)
         let validBudget = RunBudget(memoryMiB: 1024,timeoutSeconds: 15,runTimeoutSeconds: 30,maximumCPUSeconds: 15)
         let python = "/usr/bin/python3"
-        let check = ProjectCheck(id: "project",subjectID: "system",command: [python,"check.py"],toolDigests: [python:Canonical.digest(try Data(contentsOf: URL(fileURLWithPath: python))),builder.path:Canonical.digest(try Data(contentsOf: builder))],reportBuilder: builder.path,report: "Verification/Project/Report.json",contracts: ["SPEC.md","check.py"],budget: validBudget,approved: true,stage: stage)
+        let check = ProjectCheck(id: "project",subjectID: "system",command: [python,"check.py"],toolDigests: [python:Canonical.digest(try Data(contentsOf: URL(fileURLWithPath: python))),builder.path:Canonical.digest(try Data(contentsOf: builder))],reportBuilder: builder.path,report: "Verification/Project/Report.json",contracts: ["SPEC.md","check.py"],budget: validBudget,stage: stage)
         let configuration = VerificationConfiguration(project: check)
         let decoded = try ConfigurationReader.decode(try Canonical.encode(configuration))
         #expect(decoded.project?.stage == stage)
@@ -63,7 +75,7 @@ import VerificationStore
         let forged = JobDescriptor(planID: plan.id,input: plan.body.input,job: plan.body.jobs[0],executorIdentity: plan.body.executorIdentity,budget: expandedBudget)
         #expect(throws: InvarError.self) { try PlanValidation.descriptor(forged) }
         let descriptor = ExecutionBinding.descriptor(plan: plan,job: plan.body.jobs[0])
-        let context = BackendContext(descriptor: descriptor,descriptorID: try descriptor.identity(),inputRoot: input,outputRoot: output,timeoutSeconds: budget.timeoutSeconds,ownerPID: ProcessInfo.processInfo.processIdentifier,nativeExecutionAllowed: true)
+        let context = BackendContext(descriptor: descriptor,descriptorID: try descriptor.identity(),inputRoot: input,outputRoot: output,timeoutSeconds: budget.timeoutSeconds,ownerPID: ProcessInfo.processInfo.processIdentifier)
         return (root,context)
     }
     @Test func realWorkflowRetainsIncompleteReportAndDoesNotUseLiveSources() async throws {
@@ -73,6 +85,13 @@ import VerificationStore
         #expect(evidence.artifacts.count == 2 && Set(evidence.artifacts.map(\.profile)) == ["project-report/1","project-evidence/1"])
         try PlanValidation.evidence(evidence,job: context.job)
         #expect(try String(contentsOf: context.inputRoot.appendingPathComponent("Code.swift"),encoding: .utf8).contains("1 + 1"))
+    }
+    @Test func projectWorkflowCannotReadOrChangeOutsideFilesOrBindNetwork() async throws {
+        let (root,context) = try fixture(checkIsolation: true)
+        defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
+        let evidence = try await ProjectBackend().execute(context)
+        #expect(evidence.execution == "completed")
+        #expect(try Data(contentsOf: root.appendingPathComponent("outside")) == Data("intact".utf8))
     }
     @Test func greenfieldVerificationRejectsSealedSourceBeforeExecuting() async throws {
         let (root,context) = try fixture(stage: .greenfieldSpecification)
@@ -86,7 +105,7 @@ import VerificationStore
         defer { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
         let evidence = try await ProjectBackend().execute(context)
         #expect(evidence.execution == "completed" && evidence.outcome == "unknown")
-        let report = try Data(contentsOf: context.outputRoot.appendingPathComponent("native/validated-report.json"))
+        let report = try Data(contentsOf: context.outputRoot.appendingPathComponent("native/validation/validated-report.json"))
         let document = try #require(JSONSerialization.jsonObject(with: report) as? [String:Any])
         let metadata = try #require(document["metadata"] as? [String:Any])
         let verification = try #require(metadata["verificationReport"] as? [String:Any])
@@ -142,7 +161,7 @@ import VerificationStore
         do {
             let operation = WorkspaceOperation.preparePlan(configurationPath: "invar.json",changeRevisionID: nil,budget: context.descriptor.budget)
             let demand = WorkspaceOperationsTests().demand(operation)
-            let id = try await operations.execute(demand,authority: OperationAuthority(principal: "agent",policyRevision: 1,capabilities: [.planning]))
+            let id = try await operations.execute(demand)
             let plan = try await store.schedulingPlan(id)
             let comparison = try await operations.applicability(of: plan)
             #expect(comparison.status == "matchesInputs")

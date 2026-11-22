@@ -8,12 +8,11 @@ public struct ProviderActionRegistration: Codable, Sendable, Equatable {
     public let input: VerificationInput
     public let sourceFingerprint: String
     public let intent: Data
-    public let authority: Data
     public let runRequestID: String
     public let run: Data
     public let expiresAt: Double
-    public init(id: String,envelope: RequestEnvelope,operation: WorkspaceOperation,input: VerificationInput,sourceFingerprint: String,intent: Data,authority: Data,runRequestID: String,run: Data,expiresAt: Double) {
+    public init(id: String,envelope: RequestEnvelope,operation: WorkspaceOperation,input: VerificationInput,sourceFingerprint: String,intent: Data,runRequestID: String,run: Data,expiresAt: Double) {
         self.id = id; self.envelope = envelope; self.operation = operation; self.input = input; self.sourceFingerprint = sourceFingerprint
-        self.intent = intent; self.authority = authority; self.runRequestID = runRequestID; self.run = run; self.expiresAt = expiresAt
+        self.intent = intent; self.runRequestID = runRequestID; self.run = run; self.expiresAt = expiresAt
     }
 }

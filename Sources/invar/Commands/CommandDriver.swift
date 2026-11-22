@@ -7,7 +7,7 @@ struct CommandDriver {
     let options: CommandOptions
     func execute() async throws -> (Data,Int32) {
         if options.command == "capabilities" {
-            let report: JSONValue = .object(["schemaVersion":.number(2),"product":.string("Invar"),"host":.string("macOS27 arm64"),"executionOwner":.string("workspace daemon"),"translation":.string("UNVALIDATED generated-model correspondence"),"sourceAuthority":.string("authenticated ArchitectureExplorer"),"authority":.string("host policy plus fixed client capability ceiling"),"nativeProfile":.string("swift-modules-json/1"),"formalProfiles":.string("finite/quantified scalar Swift and Rust; original TLA/Lean evidence graphs")])
+            let report: JSONValue = .object(["schemaVersion":.number(2),"product":.string("Invar"),"host":.string("macOS27 arm64"),"executionOwner":.string("workspace daemon"),"translation":.string("UNVALIDATED generated-model correspondence"),"sourceAuthority":.string("authenticated ArchitectureExplorer"),"transport":.string("private same-user Unix sockets"),"nativeProfile":.string("swift-modules-json/1"),"formalProfiles":.string("finite/quantified scalar Swift and Rust; original TLA/Lean evidence graphs")])
             let bytes = try CanonicalJSON.encode(report)
             return (bytes,0)
         }

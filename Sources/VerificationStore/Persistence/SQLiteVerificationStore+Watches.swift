@@ -65,10 +65,8 @@ extension SQLiteVerificationStore {
             guard try database.head("watch",id: value.id) == nil else { throw InvarError("IDEMPOTENCY_CONFLICT","Watch is already registered") }
             let demand = try loadDemand(value.id), envelope = try loadEnvelope(value.envelopeID)
             guard case .watch(let path,let budget) = demand.request, demand.state == "running", demand.envelopeID == value.envelopeID, demand.principal == value.principal,
-                envelope.sessionID != nil, envelope.principal == value.principal, envelope.workspaceID == value.workspaceID, envelope.policyRevision == value.policyRevision,
-                path == value.configurationPath, budget == value.budget, Set(value.capabilities).isSubset(of: Set(envelope.capabilities)) else { throw InvarError("POLICY_DENIED","Registration differs from its original authenticated running watch demand",exitCode: 8) }
-            let grant = try watchAuthority(value)
-            guard value.expiresAt == grant.expiresAt else { throw InvarError("POLICY_DENIED","Watch cannot extend its principal lifetime",exitCode: 8) }
+                envelope.principal == value.principal, envelope.workspaceID == value.workspaceID,
+                path == value.configurationPath, budget == value.budget else { throw InvarError("POLICY_DENIED","Registration differs from its original running watch demand",exitCode: 8) }
             guard try watches(states: ["registering","active","paused","stopping"]).count < 32 else { throw InvarError("RESOURCE_LIMIT","Watch registration capacity exhausted",exitCode: 6) }
             try insertWatch(value,expectedRevision: 0)
         }
@@ -81,8 +79,8 @@ extension SQLiteVerificationStore {
         try transaction(usingFailureReserve: value.state != "active") {
             let previous = try loadWatch(value.id)
             guard previous.revision == expectedRevision, value.revision == expectedRevision+1 else { throw InvarError("REVISION_CONFLICT","Watch revision changed") }
-            guard previous.envelopeID == value.envelopeID, previous.workspaceID == value.workspaceID, previous.principal == value.principal, previous.policyRevision == value.policyRevision,
-                previous.capabilities == value.capabilities, previous.configurationPath == value.configurationPath, previous.budget == value.budget, previous.expiresAt == value.expiresAt,
+            guard previous.envelopeID == value.envelopeID, previous.workspaceID == value.workspaceID, previous.principal == value.principal,
+                previous.configurationPath == value.configurationPath, previous.budget == value.budget, previous.expiresAt == value.expiresAt,
                 ["registering","active","paused","stopping"].contains(previous.state) else { throw InvarError("INVALID_TRANSITION","Watch authority is fixed and stop/expiry is terminal") }
             if previous.state == "registering" {
                 guard ["stopped","expired"].contains(value.state) || completingRegistration && value.state == "active" else { throw InvarError("INVALID_TRANSITION","Registration activation belongs to its parent terminal transaction") }
@@ -92,7 +90,6 @@ extension SQLiteVerificationStore {
             if previous.state == "stopping" {
                 guard ["stopping",previous.stopTarget].compactMap({ $0 }).contains(value.state), value.stopTarget == previous.stopTarget else { throw InvarError("INVALID_TRANSITION","An owned stop cannot reopen or change its target") }
             }
-            if value.state == "active" { _ = try watchAuthority(value) }
             if ["stopped","expired"].contains(value.state) {
                 guard value.cycle.phase == "idle", value.cycle.pendingDemandID == nil, value.state != "expired" || value.expiresAt <= Date().timeIntervalSince1970 else { throw InvarError("INVALID_TRANSITION","Terminal watch must finish cleanup and its expiry must be real") }
                 var candidates = [previous.cycle.pendingDemandID].compactMap { $0 }
@@ -126,7 +123,7 @@ extension SQLiteVerificationStore {
     }
     private func validateWatch(_ value: WatchRecord) throws {
         try safeID(value.id); try safeID(value.envelopeID); _ = try Canonical.relative(value.configurationPath); try PlanValidation.budget(value.budget)
-        guard value.revision > 0, value.revision < Int.max, value.policyRevision > 0, value.cycle.generation >= 0, value.cycle.generation < Int.max,
+        guard value.revision > 0, value.revision < Int.max, value.cycle.generation >= 0, value.cycle.generation < Int.max,
             ["registering","active","paused","stopping","stopped","expired"].contains(value.state),
             value.state != "registering" || value.revision == 1 && value.cycle == WatchCycle() && value.lastPlanID == nil && value.lastRunID == nil && value.lastView == nil && value.failure == nil,
             value.state != "stopping" || value.stopTarget == "stopped" || value.stopTarget == "expired",
@@ -135,19 +132,10 @@ extension SQLiteVerificationStore {
             ["idle","preparing","verifying","reconciling"].contains(value.cycle.phase),
             value.cycle.phase != "idle" || value.cycle.pendingDemandID == nil,
             !["verifying","reconciling"].contains(value.cycle.phase) || value.cycle.planID != nil,
-            value.expiresAt.isFinite, Set(value.capabilities).count == value.capabilities.count, !value.capabilities.contains(.administration),
-            Set(value.capabilities).isSuperset(of: [.watching,.planning,.verification]),
+            value.expiresAt.isFinite,
             (value.failure?.message.utf8.count ?? 0) <= 1024, (value.failure?.code.utf8.count ?? 0) <= 128 else { throw InvarError("INVALID_REQUEST","Invalid watch scope/state bounds") }
         let bytes = try Canonical.encode(value)
         guard bytes.count <= 16384 else { throw InvarError("RESOURCE_LIMIT","Watch metadata exceeds16 KiB",exitCode: 6) }
-    }
-    func watchAuthority(_ value: WatchRecord) throws -> PrincipalGrant {
-        guard let host = try loadPolicy(), host.workspaceID == value.workspaceID, host.revision == value.policyRevision,
-            let principal = try self.principal(identity: value.principal), principal.expiresAt > Date().timeIntervalSince1970,
-            principal.workspaceID == value.workspaceID, value.expiresAt <= principal.expiresAt,
-            let peer = host.peers.first(where: { $0.binaryDigest == principal.binaryDigest }),
-            Set(value.capabilities).isSubset(of: Set(peer.capabilities).intersection(Set(principal.capabilities))) else { throw InvarError("POLICY_DENIED","Watch's original authority expired or was revoked",exitCode: 8) }
-        return principal
     }
     private func insertWatch(_ value: WatchRecord,expectedRevision: Int) throws {
         let row = Canonical.parts("invar.watch-revision/2",[value.id,String(value.revision)])

@@ -14,10 +14,6 @@ public actor LocalDaemonAdministration: DaemonAdministrating {
         guard deadlineSeconds.isFinite, (1...300).contains(deadlineSeconds) else { throw InvarError("INVALID_REQUEST","Stop deadline must be 1...300 seconds") }
         return try await exchange("host.stop",body: .object(["mode":.string(mode.rawValue),"deadlineSeconds":.number(deadlineSeconds)]))
     }
-    public func applyPolicy(_ policy: WorkspacePolicy,expectedRevision: Int) async throws -> DaemonStatus {
-        let value = try JSONValue.encode(policy)
-        return try await exchange("host.policy.apply",body: .object(["policy":value,"expectedRevision":.number(Double(expectedRevision))]))
-    }
     private func record() throws -> DaemonHostRecord {
         guard !closed else { throw InvarError("SESSION_CLOSED","Administrative client is closed") }
         var parent = stat()
@@ -44,7 +40,7 @@ public actor LocalDaemonAdministration: DaemonAdministrating {
         guard bytes.count <= 16384 else { throw InvarError("RESOURCE_LIMIT","Host-control record grew beyond its bound") }
         let value = try JSONDecoder().decode(DaemonHostRecord.self,from: bytes)
         guard value.schemaVersion == 2, value.endpoint.workspaceID == paths.workspaceID, value.endpoint.socketPath == paths.controlSocket.path, value.endpoint.dataSocketPath == paths.dataSocket.path,
-            value.processID > 1, Data(base64Encoded: value.auditIdentity)?.count == 32, (32...256).contains(value.administrativeCredential.utf8.count) else { throw InvarError("AUTHENTICATION_REQUIRED","Host record workspace/protocol differs",exitCode: 8) }
+            value.processID > 1, Data(base64Encoded: value.auditIdentity)?.count == 32 else { throw InvarError("AUTHENTICATION_REQUIRED","Host record workspace/protocol differs",exitCode: 8) }
         guard value.stateDirectory == paths.stateDirectory.path else {
             throw InvarError("WORKSPACE_STATE_MISMATCH", "Use the state directory configured for this workspace daemon", exitCode: 8)
         }
@@ -57,7 +53,7 @@ public actor LocalDaemonAdministration: DaemonAdministrating {
         connections[id] = connection
         defer { connections.removeValue(forKey: id); await connection.close() }
         guard !closed else { throw InvarError("SESSION_CLOSED","Administrative client closed while connecting") }
-        let request: JSONValue = .object(["id":.string(id.uuidString),"protocolVersion":.number(2),"workspaceID":.string(paths.workspaceID),"epoch":.string(record.epoch),"credential":.string(record.administrativeCredential),"method":.string(method),"body":body])
+        let request: JSONValue = .object(["id":.string(id.uuidString),"protocolVersion":.number(3),"workspaceID":.string(paths.workspaceID),"epoch":.string(record.epoch),"method":.string(method),"body":body])
         let bytes = try CanonicalJSON.encode(request)
         guard bytes.count <= 65_536 else { throw InvarError("RESOURCE_LIMIT","Administrative request exceeds typed IPC bound",exitCode: 6) }
         try await connection.write(request,timeout: .seconds(5))

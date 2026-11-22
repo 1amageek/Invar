@@ -58,7 +58,6 @@ public actor DaemonRPCServer: DaemonRPCServing {
     private nonisolated static func process(_ connection: LocalConnection,handler: any DaemonRequestHandling,channel: DaemonRPCChannel) async {
         defer { await connection.close() }
         do {
-            let peer = try await connection.peerIdentity()
             guard let request = try await connection.read(timeout: .seconds(5)) else { return }
             defer {
                 if let observer = handler as? any DaemonResponseObserving { await observer.responseFinished(request) }
@@ -67,7 +66,7 @@ public actor DaemonRPCServer: DaemonRPCServing {
             do {
                 let bytes = try CanonicalJSON.encode(request)
                 guard bytes.count <= 65_536, let identity = id.string, !identity.isEmpty, identity.utf8.count <= 128 else { throw InvarError("INVALID_REQUEST","RPC request identity/size exceeds typed protocol limits",exitCode: 2) }
-                guard let value = try await handler.handle(request,peer: peer,channel: channel) else { return }
+                guard let value = try await handler.handle(request,channel: channel) else { return }
                 let response: JSONValue = .object(["id":id,"result":value])
                 let encoded = try CanonicalJSON.encode(response)
                 guard encoded.count <= 1_048_576 else { throw InvarError("RESOURCE_LIMIT","RPC response exceeds its page budget",exitCode: 6) }
@@ -83,7 +82,7 @@ public actor DaemonRPCServer: DaemonRPCServing {
                 try await connection.write(.object(["id":id,"error":body]),timeout: .seconds(5))
             }
         } catch {
-            // An unauthenticated/closed peer loses only this connection. Its
+            // A closed local peer loses only this connection. Its
             // transport failure does not cancel any durably accepted operation.
         }
     }

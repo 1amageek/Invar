@@ -22,7 +22,7 @@ admitted job id + sealed input/artifact access + engine identity
 ```
 
 ## Contracts and Invariants
-Worker requests contain immutable ids, minimum typed job context, approved private access roots, exact tool/executor identities and remaining limits. They do not contain entire queued ScopeInventory/source/report blobs. The worker checks actual parent/group/start identity and input hashes before running. Worker output is an immutable result reference plus bounded diagnostics, not a multi-megabyte stdout report.
+Worker requests contain immutable ids, minimum typed job context, attempt-scoped access roots, exact tool/executor identities and remaining limits. They do not contain entire queued ScopeInventory/source/report blobs. The worker checks actual parent/group/start identity and input hashes before running. Worker output is an immutable result reference plus bounded diagnostics, not a multi-megabyte stdout report.
 
 Keep trusted build/formal helper groups supervised and inherit ownership into nested tools. Native or user-Lean executable code needs an actually enforced no-fork isolated-session sandbox and durable launch intent/PID identity before resume. The daemon retains ownership of such sessions/journals even if preparation is offloaded. Separate processes alone are not isolation.
 

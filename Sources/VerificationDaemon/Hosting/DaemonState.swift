@@ -7,11 +7,10 @@ public actor DaemonState: DaemonStateReading {
     private let workspaceID: String
     private let epoch: String
     private let engineIdentity: String
-    private var policyRevision: Int
     private var phase: Phase = .starting
     private var diagnostics: [String] = []
-    public init(workspaceID: String,epoch: String,engineIdentity: String,policyRevision: Int) {
-        self.workspaceID = workspaceID; self.epoch = epoch; self.engineIdentity = engineIdentity; self.policyRevision = policyRevision
+    public init(workspaceID: String,epoch: String,engineIdentity: String) {
+        self.workspaceID = workspaceID; self.epoch = epoch; self.engineIdentity = engineIdentity
     }
     public func transition(to next: Phase,diagnostics: [String] = []) throws {
         let allowed: Set<Phase>
@@ -26,11 +25,7 @@ public actor DaemonState: DaemonStateReading {
         guard next == phase || allowed.contains(next), diagnostics.count <= 32, diagnostics.allSatisfy({ $0.utf8.count <= 4096 }) else { throw InvarError("INVALID_TRANSITION","Invalid daemon phase/diagnostics") }
         phase = next; self.diagnostics = diagnostics
     }
-    public func policyChanged(revision: Int) throws {
-        guard revision > policyRevision else { throw InvarError("REVISION_CONFLICT","Daemon policy revision cannot move backwards") }
-        policyRevision = revision
-    }
     public func status(activeOperations: Int,watchCount: Int) -> DaemonStatus {
-        DaemonStatus(workspaceID: workspaceID,epoch: epoch,engineIdentity: engineIdentity,policyRevision: policyRevision,state: phase.rawValue,activeOperations: activeOperations,watchCount: watchCount,diagnostics: diagnostics)
+        DaemonStatus(workspaceID: workspaceID,epoch: epoch,engineIdentity: engineIdentity,state: phase.rawValue,activeOperations: activeOperations,watchCount: watchCount,diagnostics: diagnostics)
     }
 }

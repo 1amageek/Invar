@@ -53,9 +53,6 @@
         "to": {
           "$ref": "urn:invar:schema:2:types#/$defs/selector"
         },
-        "approved": {
-          "type": "boolean"
-        },
         "required": {
           "type": "boolean"
         }
@@ -92,9 +89,6 @@
         "toolchain": {
           "type": "string",
           "minLength": 1
-        },
-        "approved": {
-          "type": "boolean"
         },
         "required": {
           "type": "boolean"
@@ -227,9 +221,6 @@
             11
           ]
         },
-        "approved": {
-          "type": "boolean"
-        },
         "required": {
           "type": "boolean"
         }
@@ -276,9 +267,6 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000
-        },
-        "approved": {
-          "type": "boolean"
         },
         "required": {
           "type": "boolean"
@@ -618,9 +606,6 @@
         "required": {
           "type": "boolean"
         },
-        "approved": {
-          "type": "boolean"
-        },
         "dependencies": {
           "type": "array",
           "items": {
@@ -673,7 +658,6 @@
         "id",
         "backend",
         "required",
-        "approved",
         "dependencies",
         "memoryMiB",
         "inputs"
@@ -1229,9 +1213,6 @@
         "required": {
           "type": "boolean"
         },
-        "approved": {
-          "type": "boolean"
-        },
         "acceptsUnvalidatedModel": {
           "type": "boolean"
         },
@@ -1262,7 +1243,6 @@
         "id",
         "backend",
         "required",
-        "approved",
         "acceptsUnvalidatedModel",
         "acceptsFuzzBudget",
         "dependencies",
@@ -1390,9 +1370,6 @@
         "budget": {
           "$ref": "#/$defs/budget"
         },
-        "approved": {
-          "type": "boolean"
-        },
         "required": {
           "type": "boolean"
         }
@@ -1406,7 +1383,6 @@
         "report",
         "contracts",
         "budget",
-        "approved",
         "required"
       ],
       "additionalProperties": false

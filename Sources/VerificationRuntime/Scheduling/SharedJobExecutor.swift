@@ -23,7 +23,7 @@ actor SharedJobExecutor {
     init(backend: any VerificationBackend,repository: any VerificationRepository,policy: SchedulingPolicy,resources: (any WorkspaceResourceAdmitting)?) {
         self.backend = backend; self.repository = repository; self.policy = policy; pool = resources ?? ResourcePool(policy: policy)
     }
-    func execute(reference: JobReference,input: VerificationInput,budget: RunBudget,demandID: String?,nativeExecutionAllowed: Bool,replay: Bool,priority: Int) async throws -> VerificationEvidence {
+    func execute(reference: JobReference,input: VerificationInput,budget: RunBudget,demandID: String?,replay: Bool,priority: Int) async throws -> VerificationEvidence {
         try Task.checkCancellation()
         guard !stopped else { throw InvarError("COORDINATOR_STOPPED","Shared executor stopped") }
         if !replay, let key = reference.executionKey, let cached = try await repository.reusableEvidence(key: key) {
@@ -59,7 +59,7 @@ actor SharedJobExecutor {
                 if let demandID { try await repository.attachExecution(row.id,to: demandID,jobID: reference.id) }
                 try Task.checkCancellation()
                 let value = try await withCheckedThrowingContinuation { continuation in
-                    confirm(sharingKey,interest: interest,continuation: continuation,queued: row,reference: reference,input: input,budget: budget,nativeExecutionAllowed: nativeExecutionAllowed,priority: priority)
+                    confirm(sharingKey,interest: interest,continuation: continuation,queued: row,reference: reference,input: input,budget: budget,priority: priority)
                 }
                 try Task.checkCancellation()
                 return value
@@ -69,7 +69,7 @@ actor SharedJobExecutor {
             }
         } onCancel: { Task { _ = await self.cancelResult(sharingKey,interest: interest) } }
     }
-    private func confirm(_ key: String,interest: String,continuation: CheckedContinuation<VerificationEvidence,any Error>,queued: ExecutionRecord,reference: JobReference,input: VerificationInput,budget: RunBudget,nativeExecutionAllowed: Bool,priority: Int) {
+    private func confirm(_ key: String,interest: String,continuation: CheckedContinuation<VerificationEvidence,any Error>,queued: ExecutionRecord,reference: JobReference,input: VerificationInput,budget: RunBudget,priority: Int) {
         guard var entry = entries[key], entry.interests.contains(interest), !stopped else { continuation.resume(throwing: CancellationError()); return }
         if let result = entry.result {
             entry.interests.remove(interest)
@@ -84,7 +84,7 @@ actor SharedJobExecutor {
             let request = ResourceRequest(id: queued.id,memoryMiB: reference.memoryMiB,processes: budget.maximumProcesses,scratchBytes: budget.maximumWorkspaceBytes,priority: priority)
             entry.work = Task {
                 let result: Result<VerificationEvidence,any Error>
-                do { result = .success(try await Self.perform(queued: queued,reference: reference,input: input,budget: budget,request: request,nativeExecutionAllowed: nativeExecutionAllowed,repository: repository,backend: backend,pool: pool,policy: policy)) }
+                do { result = .success(try await Self.perform(queued: queued,reference: reference,input: input,budget: budget,request: request,repository: repository,backend: backend,pool: pool,policy: policy)) }
                 catch { result = .failure(error) }
                 self.finished(key,id: queued.id,result: result)
             }
@@ -133,7 +133,7 @@ actor SharedJobExecutor {
         let pending = Array(releases.values)
         for release in pending { _ = await release.result }
     }
-    private nonisolated static func perform(queued: ExecutionRecord,reference: JobReference,input: VerificationInput,budget: RunBudget,request: ResourceRequest,nativeExecutionAllowed: Bool,repository: any VerificationRepository,backend: any VerificationBackend,pool: any WorkspaceResourceAdmitting,policy: SchedulingPolicy) async throws -> VerificationEvidence {
+    private nonisolated static func perform(queued: ExecutionRecord,reference: JobReference,input: VerificationInput,budget: RunBudget,request: ResourceRequest,repository: any VerificationRepository,backend: any VerificationBackend,pool: any WorkspaceResourceAdmitting,policy: SchedulingPolicy) async throws -> VerificationEvidence {
         var revision = 1, reserved = false
         do { try await pool.acquire(request) }
         catch { try await fail(queued,revision: revision,error: error,repository: repository); throw error }
@@ -156,7 +156,7 @@ actor SharedJobExecutor {
                 let preparation: URL?
                 if let unit = descriptor.job.compilation { preparation = try await repository.preparationOutput(unit.id) } else { preparation = nil }
                 try FileManager.default.createDirectory(at: output,withIntermediateDirectories: true,attributes: [.posixPermissions: 0o700])
-                let context = BackendContext(descriptor: descriptor,descriptorID: reference.descriptorID,inputRoot: inputRoot,outputRoot: output,compilationRoot: preparation,timeoutSeconds: budget.timeoutSeconds,ownerPID: ProcessInfo.processInfo.processIdentifier,nativeExecutionAllowed: nativeExecutionAllowed)
+                let context = BackendContext(descriptor: descriptor,descriptorID: reference.descriptorID,inputRoot: inputRoot,outputRoot: output,compilationRoot: preparation,timeoutSeconds: budget.timeoutSeconds,ownerPID: ProcessInfo.processInfo.processIdentifier)
                 let value = try await BoundedOperation.run(seconds: context.timeoutSeconds) { try await backend.execute(context) }
                 try PlanValidation.evidence(value,job: reference)
                 guard value.inputID == input.id else { throw InvarError("INVALID_RESULT","Worker returned another original input") }

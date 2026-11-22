@@ -14,26 +14,26 @@ import VerificationCore
     @Test func generationIsBoundToOneSourceAndCannotReportAProof() throws {
         let file = InputEntry(path: "Source.swift",digest: Canonical.digest(Data("source".utf8)),byteCount: 6)
         let entity = EntityRecord(id: "f",kind: "function",language: "swift",name: "f",path: file.path,sourceDigest: file.digest,startByte: 0,endByte: 6)
-        let job = VerificationJob(id: "generate-model",backend: "modelGeneration",required: false,approved: true,inputs: [file],modelSource: entity)
+        let job = VerificationJob(id: "generate-model",backend: "modelGeneration",required: false,inputs: [file],modelSource: entity)
         let plan = try Self.plan(job)
         try PlanValidation.validate(plan)
         let proof = VerificationEvidence(inputID: plan.body.input.id,jobID: job.id,execution: "completed",outcome: "holdsWithinScope",domain: "generatedModel",translation: "unvalidated",scope: "source",adequacy: "unknown",detail: "",startedAt: "",finishedAt: "")
         #expect(throws: InvarError.self) { try PlanValidation.evidence(proof,job: job) }
-        let mismatched = VerificationJob(id: job.id,backend: job.backend,required: false,approved: true,inputs: [],modelSource: entity)
+        let mismatched = VerificationJob(id: job.id,backend: job.backend,required: false,inputs: [],modelSource: entity)
         #expect(throws: InvarError.self) { try PlanValidation.validate(Self.plan(mismatched)) }
     }
     @Test func savedPlansCannotBypassNativeCountOrFuzzRangeValidation() throws {
-        let native = NativeCheck(id: "native", profile: Self.profile, expectedTestCount: 0, approved: true)
+        let native = NativeCheck(id: "native", profile: Self.profile, expectedTestCount: 0)
         let harness = InputEntry(path: "Harness.swift",digest: Canonical.digest(Data("harness".utf8)),byteCount: 7)
-        let nativeJob = VerificationJob(id: native.id, backend: "native", required: true, approved: true, inputs: [harness], native: native)
-        let validNative = NativeCheck(id: "native",profile: Self.profile,expectedTestCount: 1,approved: true)
-        let validNativePlan = try Self.plan(VerificationJob(id: validNative.id,backend: "native",required: true,approved: true,inputs: [harness],native: validNative))
+        let nativeJob = VerificationJob(id: native.id, backend: "native", required: true, inputs: [harness], native: native)
+        let validNative = NativeCheck(id: "native",profile: Self.profile,expectedTestCount: 1)
+        let validNativePlan = try Self.plan(VerificationJob(id: validNative.id,backend: "native",required: true,inputs: [harness],native: validNative))
         try PlanValidation.validate(validNativePlan)
         let invalidNative = try Self.plan(nativeJob)
         #expect(throws: (any Error).self) { try PlanValidation.validate(invalidNative) }
-        let fuzz = FuzzCheck(id: "fuzz", profile: Self.profile, corpus: "corpus.json", seed: "7", minimum: "9", maximum: "1", iterations: -1, approved: true)
+        let fuzz = FuzzCheck(id: "fuzz", profile: Self.profile, corpus: "corpus.json", seed: "7", minimum: "9", maximum: "1", iterations: -1)
         let corpus = InputEntry(path: "corpus.json",digest: Canonical.digest(Data("[]".utf8)),byteCount: 2)
-        let fuzzJob = VerificationJob(id: fuzz.id, backend: "fuzz", required: true, approved: true, inputs: [harness,corpus], oracle: corpus, fuzz: fuzz)
+        let fuzzJob = VerificationJob(id: fuzz.id, backend: "fuzz", required: true, inputs: [harness,corpus], oracle: corpus, fuzz: fuzz)
         let invalidFuzz = try Self.plan(fuzzJob)
         #expect(throws: (any Error).self) { try PlanValidation.validate(invalidFuzz) }
     }
@@ -45,14 +45,14 @@ import VerificationCore
         #expect(throws: (any Error).self) { try PlanValidation.validate(changedBinding) }
     }
     @Test func configurationIdentityIgnoresOnlyDeclarationOrder() throws {
-        let a = ArchitecturePolicy(id: "a", kind: "cycle", approved: true)
-        let b = ArchitecturePolicy(id: "b", kind: "cycle", approved: true)
+        let a = ArchitecturePolicy(id: "a", kind: "cycle")
+        let b = ArchitecturePolicy(id: "b", kind: "cycle")
         #expect(try VerificationConfiguration(architecture: [a, b]).identity() == VerificationConfiguration(architecture: [b, a]).identity())
         #expect(try VerificationConfiguration(architecture: [a, b]).identity() != VerificationConfiguration(architecture: [a]).identity())
     }
     @Test func fuzzBudgetCannotBePromotedToProof() throws {
-        let check = FuzzCheck(id: "fuzz", profile: Self.profile, corpus: "corpus.json", seed: "7", minimum: "0", maximum: "10", iterations: 3, approved: true)
-        let job = VerificationJob(id: "fuzz", backend: "fuzz", required: true, approved: true, fuzz: check)
+        let check = FuzzCheck(id: "fuzz", profile: Self.profile, corpus: "corpus.json", seed: "7", minimum: "0", maximum: "10", iterations: 3)
+        let job = VerificationJob(id: "fuzz", backend: "fuzz", required: true, fuzz: check)
         let fakeProof = try DomainTests.evidence("fuzz", domain: "nativeExecution")
         let association = try DomainTests.association(fakeProof)
         #expect(!RunAssessment.accepts(fakeProof,for: job,association: association))

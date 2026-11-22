@@ -8,17 +8,15 @@ public struct FormalCheck: Codable, Sendable, Equatable {
     public let toolchain: String
     public let memoryMiB: Int?
     public var admissionMemoryMiB: Int { memoryMiB ?? (mode == "quantified" ? 2560 : 1536) }
-    public let approved: Bool
     public let required: Bool
     public let acceptUnvalidatedModel: Bool
-    public init(id: String, source: String, mode: String, specification: String, toolchain: String, approved: Bool = false, required: Bool = true, acceptUnvalidatedModel: Bool = false,memoryMiB: Int? = nil) {
+    public init(id: String, source: String, mode: String, specification: String, toolchain: String, required: Bool = true, acceptUnvalidatedModel: Bool = false,memoryMiB: Int? = nil) {
         self.memoryMiB = memoryMiB
         self.id = id
         self.source = source
         self.mode = mode
         self.specification = specification
         self.toolchain = toolchain
-        self.approved = approved
         self.required = required
         self.acceptUnvalidatedModel = acceptUnvalidatedModel
     }

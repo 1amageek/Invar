@@ -33,7 +33,7 @@ import VerificationRuntime
             try await repository.savePlan(plan); planID = plan.id
             return DaemonSourceStatus(availability)
         }
-        func execute(_ demand: RunDemand,authority: OperationAuthority) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Lifecycle fixture prepublishes one static plan") }
+        func execute(_ demand: RunDemand) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Lifecycle fixture prepublishes one static plan") }
         func applicability(of plan: SchedulingPlan) -> InputComparison { InputComparison(target: plan.input,status: "matchesInputs",basis: "Fixed lifecycle fixture") }
         func sourceStatus() -> DaemonSourceStatus { DaemonSourceStatus(availability) }
         func closeAdmission() { stopped = true }
@@ -73,19 +73,14 @@ import VerificationRuntime
         defer { task.cancel(); do { try await task.value } catch is CancellationError {} catch { Issue.record(error) } }
         let admin = LocalDaemonAdministration(paths: configuration.paths)
         let initial = try await ready(admin)
-        #expect(initial.state == "approvalRequired" && initial.activeOperations == 0)
+        #expect(["ready","recovering"].contains(initial.state) && initial.activeOperations == 0)
         let secondConfiguration = try DaemonConfiguration(workspace: configuration.workspace,executable: configuration.executable,stateDirectory: root.appendingPathComponent("other-state"))
         let second = WorkspaceDaemon(servicesBuilder: Builder())
         await #expect(throws: InvarError.self) { try await second.serve(secondConfiguration) }
         #expect(!FileManager.default.fileExists(atPath: secondConfiguration.paths.stateDirectory.path))
-        let peer = try ConnectionPeer.current(), endpoint = try await admin.endpoint()
         let planID = try #require(await builder.planID())
-        let job = SchedulerTests.job("cycle")
-        let configurationDigest = try VerificationConfiguration(architecture: [try #require(job.policy)]).identity()
-        let policy = WorkspacePolicy(workspaceID: endpoint.workspaceID,engineIdentity: endpoint.engineIdentity,revision: 1,peers: [PeerGrant(binaryDigest: peer.binaryDigest,capabilities: [.read,.verification])],approvals: [ContractApproval(configurationDigest: configurationDigest,entries: [])],sessionSeconds: 60,principalSeconds: 120,maximumSessions: 8,maximumConnections: 4,maximumEnvelopeSeconds: 30)
-        let approved = try await admin.applyPolicy(policy,expectedRevision: 0)
-        #expect(approved.state == "ready" && approved.policyRevision == 1)
-        let client = try await LocalVerificationClient.connect(endpoint: endpoint,capabilities: [.read,.verification])
+        let endpoint = try await admin.endpoint()
+        let client = try await LocalVerificationClient.connect(endpoint: endpoint)
         let operation = WorkspaceOperation.verify(planID: planID,changeRevisionID: nil,replayOfRunID: nil)
         let prepared = try await client.prepare(operation,key: "host-verification",timeout: 20)
         let receipt = try await client.accept(prepared)
@@ -121,7 +116,7 @@ import VerificationRuntime
         let admin = LocalDaemonAdministration(paths: configuration.paths)
         defer { task.cancel(); do { try await task.value } catch is CancellationError {} catch { Issue.record(error) }; await admin.shutdown() }
         let initial = try await ready(admin)
-        #expect(initial.state == "approvalRequired")
+        #expect(["sourceOffline","recovering"].contains(initial.state))
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
         let owner = try DaemonOwnership(paths: configuration.paths); try await owner.release()
@@ -139,7 +134,7 @@ extension DaemonLifecycleTests {
             catch { cancelled = true; throw error }
         }
         func sourceStatus() -> DaemonSourceStatus { DaemonSourceStatus(.sourceOffline) }
-        func execute(_ demand: RunDemand,authority: OperationAuthority) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Startup gate fixture") }
+        func execute(_ demand: RunDemand) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Startup gate fixture") }
         func applicability(of plan: SchedulingPlan) -> InputComparison { InputComparison(target: nil,status: "unknown",basis: "Startup gate fixture") }
         func closeAdmission() {}
         func shutdown() {}
@@ -175,7 +170,7 @@ extension DaemonLifecycleTests {
     struct FailedServices: DaemonWorkspaceServices {
         func start() throws -> DaemonSourceStatus { throw InvarError("FIXTURE_RECOVERY_FAILURE","Initialization cannot establish its required state") }
         func sourceStatus() -> DaemonSourceStatus { DaemonSourceStatus(.sourceOffline) }
-        func execute(_ demand: RunDemand,authority: OperationAuthority) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Blocked recovery fixture") }
+        func execute(_ demand: RunDemand) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Blocked recovery fixture") }
         func applicability(of plan: SchedulingPlan) -> InputComparison { InputComparison(target: nil,status: "unknown",basis: "Blocked recovery fixture") }
         func closeAdmission() {}
         func shutdown() {}
@@ -183,7 +178,7 @@ extension DaemonLifecycleTests {
     struct FailedBuilder: DaemonServicesBuilding {
         func make(configuration: DaemonConfiguration,repository: any VerificationRepository,epoch: String,engineIdentity: String,resources: any WorkspaceResourceAdmitting) -> any DaemonWorkspaceServices { FailedServices() }
     }
-    @Test func blockedRecoveryKeepsAuthenticatedControlAvailableUntilExplicitStop() async throws {
+    @Test func blockedRecoveryKeepsLocalControlAvailableUntilExplicitStop() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("invar-recovery-blocked-" + UUID().uuidString)
         let configuration = try configuration(root: root)
         let host = WorkspaceDaemon(servicesBuilder: FailedBuilder())
@@ -222,7 +217,7 @@ extension DaemonLifecycleTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o644],ofItemAtPath: path.path)
         await #expect(throws: InvarError.self) { try await admin.status() }
         try FileManager.default.setAttributes([.posixPermissions: 0o600],ofItemAtPath: path.path)
-        #expect(try await admin.status().state == "approvalRequired")
+        #expect(try await admin.status().state == "ready")
         _ = try await admin.stop(mode: .cancel,deadlineSeconds: 1)
         try await task.value; await admin.shutdown()
         try FileManager.default.removeItem(at: root); try FileManager.default.removeItem(at: configuration.paths.runtimeDirectory)

@@ -47,17 +47,17 @@ struct InvarApp {
             let command = arguments.first
             if command == "--help" || command == "help" {
                 print("""
-                invar [--workspace PATH] [--policy PATH] [--no-open | --codex-browser]
+                invar [--workspace PATH] [--no-open | --codex-browser]
                 invar --version
                 invar status | stop [--workspace PATH]
                 invar mcp [--workspace PATH]
-                invar daemon start | status | stop | approve | identity [--workspace PATH]
+                invar daemon start | status | stop | identity [--workspace PATH]
                 invar capabilities | map | plan | run | report
                 """)
                 return 0
             }
             if command == nil || command?.hasPrefix("--workspace") == true ||
-                ["--policy", "--state", "--no-open", "--codex-browser", "--contracts"].contains(command ?? "") || command == "open" {
+                ["--state", "--no-open", "--codex-browser", "--contracts"].contains(command ?? "") || command == "open" {
                 try await WorkspaceCommand.open(command == "open" ? Array(arguments.dropFirst()) : arguments)
                 return 0
             }

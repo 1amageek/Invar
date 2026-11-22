@@ -4,7 +4,6 @@ import VerificationCore
 public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
     private let repository: any VerificationRepository
     private let scheduler: any VerificationScheduling
-    private let authorization: any WorkspaceAuthorizationChecking
     private let operations: any WorkspaceOperationExecuting
     private let publisher: (any VerificationPublishing)?
     private let external: (any ExternalAdmissionAuthorizing)?
@@ -15,10 +14,10 @@ public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
     private var accepting: [String:(RequestEnvelope,Task<OperationReceipt,any Error>)] = [:]
     private var admissionOpen: Bool
     private var stopped = false
-    public init(repository: any VerificationRepository,scheduler: any VerificationScheduling,authorization: any WorkspaceAuthorizationChecking,operations: any WorkspaceOperationExecuting,epoch: String,maximumDemands: Int,acceptingRequests: Bool = true,publisher: (any VerificationPublishing)? = nil,external: (any ExternalAdmissionAuthorizing)? = nil) {
+    public init(repository: any VerificationRepository,scheduler: any VerificationScheduling,operations: any WorkspaceOperationExecuting,epoch: String,maximumDemands: Int,acceptingRequests: Bool = true,publisher: (any VerificationPublishing)? = nil,external: (any ExternalAdmissionAuthorizing)? = nil) {
         self.external = external
         self.publisher = publisher
-        self.repository = repository; self.scheduler = scheduler; self.authorization = authorization; self.operations = operations
+        self.repository = repository; self.scheduler = scheduler; self.operations = operations
         admissionOpen = acceptingRequests
         self.epoch = epoch; self.maximumDemands = maximumDemands
     }
@@ -28,9 +27,9 @@ public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
         guard permit.actionID == actionID, let base = try await repository.providerAction(actionID) else { throw InvarError("ACTION_NOT_FOUND","External admission lacks its original preflight") }
         let envelope = base.envelope, operation = base.operation
         guard envelope.daemonEpoch == epoch, envelope.fingerprint == (try Canonical.identity(operation)), envelope.expiresAt > Date().timeIntervalSince1970 else { throw InvarError("REQUEST_EXPIRED","External authority is changed or expired") }
-        let authority = try await authorization.authority(principal: envelope.principal,operation: operation,policyRevision: envelope.policyRevision,capabilityCeiling: Set(envelope.capabilities))
-        guard authority.capabilities.contains(operation.requiredCapability), admissionOpen, !stopped,
-            tasks.count + accepting.count < maximumDemands else { throw InvarError("RESOURCE_LIMIT","External authority or operation capacity is unavailable") }
+        guard admissionOpen, !stopped, tasks.count + accepting.count < maximumDemands else {
+            throw InvarError("RESOURCE_LIMIT","External operation capacity is unavailable")
+        }
         guard accepting[envelope.id] == nil else { throw InvarError("IDEMPOTENCY_CONFLICT","External acceptance is already active") }
         let task = Task { try await self.acceptExternal(permit,base: base) }
         accepting[envelope.id] = (envelope,task)
@@ -65,9 +64,6 @@ public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
         let fingerprint = try Canonical.identity(operation)
         guard envelope.daemonEpoch == epoch, envelope.operation == operation.name, envelope.fingerprint == fingerprint else { throw InvarError("REQUEST_MISMATCH","Typed request differs from fixed envelope") }
         if envelope.watchID != nil { try await repository.validateWatchRequest(envelope,operation: operation,now: Date().timeIntervalSince1970) }
-        let authority = try await authorization.authority(principal: envelope.principal,operation: operation,policyRevision: envelope.policyRevision,capabilityCeiling: envelope.hasCapabilityCeiling ? Set(envelope.capabilities) : nil)
-        guard authority.principal == envelope.principal, authority.policyRevision == envelope.policyRevision,
-            !envelope.hasCapabilityCeiling || Set(envelope.capabilities).isSubset(of: authority.capabilities) && envelope.capabilities.contains(operation.requiredCapability) else { throw InvarError("POLICY_DENIED","Authority identity/revision differs",exitCode: 8) }
         if let pending = accepting[envelope.id] {
             guard pending.0 == envelope else { throw InvarError("REQUEST_MISMATCH","In-flight envelope was changed") }
             return try await pending.1.value
@@ -151,17 +147,13 @@ public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
         let queued = try await repository.loadDemand(id)
         guard queued.state == "queued" else { return }
         if envelope.watchID != nil { try await repository.validateWatchRequest(envelope,operation: queued.request,now: Date().timeIntervalSince1970) }
-        let original = try await authorization.authority(principal: queued.principal,operation: queued.request,policyRevision: envelope.policyRevision,capabilityCeiling: envelope.hasCapabilityCeiling ? Set(envelope.capabilities) : nil)
-        let capabilities = envelope.hasCapabilityCeiling ? original.capabilities.intersection(Set(envelope.capabilities)) : original.capabilities
-        guard capabilities.contains(queued.request.requiredCapability) else { throw InvarError("POLICY_DENIED","Fixed request lacks its original scoped authority",exitCode: 8) }
-        let authority = OperationAuthority(principal: original.principal,policyRevision: original.policyRevision,capabilities: capabilities)
         try Task.checkCancellation()
         let running = queued.transitioning(to: "running")
         try await repository.transitionDemand(running,expectedRevision: queued.revision)
         if case .verify(let planID,_,let replay,_) = running.request {
             let plan = try await repository.schedulingPlan(planID)
             try await publisher?.reserve(demand: running,plan: plan)
-            let run = try await scheduler.run(plan.id,nativeExecutionAllowed: authority.capabilities.contains(.nativeExecution),replay: replay != nil || (running.origin == "provider" && running.request.verificationNode != nil),persist: false,demandID: running.id)
+            let run = try await scheduler.run(plan.id,replay: replay != nil || (running.origin == "provider" && running.request.verificationNode != nil),persist: false,demandID: running.id)
             try Task.checkCancellation()
             try await completeRun(running,run: run,plan: plan)
         } else if case .reconcile(let planID,let runID) = running.request {
@@ -174,8 +166,8 @@ public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
             let result: String
             if case .cancel(let target) = running.request {
                 guard target != running.id else { throw InvarError("INVALID_REQUEST","An operation cannot await its own cancellation") }
-                try await cancel(target,principal: authority.principal,administrative: authority.capabilities.contains(.administration)); result = target
-            } else { result = try await operations.execute(running,authority: authority) }
+                try await cancel(target,principal: running.principal,administrative: running.origin != "watch"); result = target
+            } else { result = try await operations.execute(running) }
             try Task.checkCancellation()
             let current = try await repository.loadDemand(id)
             try await repository.completeDemand(current.transitioning(to: "completed",resultID: result),run: nil,view: nil,expectedRevision: current.revision)
@@ -248,7 +240,6 @@ public actor WorkspaceCoordinator: ExternalWorkspaceCoordinating {
                     let fingerprint = try Canonical.identity(demand.request)
                     guard receipt?.operationID == demand.id, receipt?.fingerprint == fingerprint, envelope.fingerprint == fingerprint, envelope.expiresAt > Date().timeIntervalSince1970 else { throw InvarError("REQUEST_EXPIRED","Original accepted request/deadline cannot be renewed by recovery",exitCode: 6) }
                     if envelope.watchID != nil { try await repository.validateWatchRequest(envelope,operation: demand.request,now: Date().timeIntervalSince1970) }
-                    _ = try await authorization.authority(principal: demand.principal,operation: demand.request,policyRevision: envelope.policyRevision,capabilityCeiling: envelope.hasCapabilityCeiling ? Set(envelope.capabilities) : nil)
                     start(demand.id,envelope: envelope)
                 } catch { try await recordFailure(demand.id,error: error) }
             } else {

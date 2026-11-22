@@ -37,7 +37,7 @@ public enum PlanValidation {
         guard ids.count == plan.body.jobs.count else { throw InvarError("INVALID_DAG", "Duplicate job identity", exitCode: 2) }
         var visited = Set<String>(), pending = plan.body.jobs
         for job in pending {
-            if let project = job.project { guard project.budget == plan.body.budget else { throw InvarError("INVALID_PLAN","Project operational budget differs from its approved configuration") } }
+            if let project = job.project { guard project.budget == plan.body.budget else { throw InvarError("INVALID_PLAN","Project operational budget differs from its configuration") } }
             try validateJob(job,executorIdentity: plan.body.executorIdentity)
             guard Set(job.dependencies).isSubset(of: ids) else { throw InvarError("INVALID_DAG","Unknown prerequisite") }
         }
@@ -70,22 +70,22 @@ public enum PlanValidation {
                 guard let source = job.modelSource, !source.language.isEmpty, source.supportsModelSelection,
                     job.inputs.count == 1, let file = job.inputs.first, source.path == file.path, source.sourceDigest == file.digest,
                     source.kind == "file" || (source.startByte ?? -1) >= 0 && (source.endByte ?? -1) > (source.startByte ?? -1) && (source.endByte ?? Int.max) <= file.byteCount,
-                    !job.required, job.approved, job.dependencies.isEmpty, job.formal == nil, job.native == nil, job.fuzz == nil, job.policy == nil, job.toolchainIdentity == nil
+                    !job.required, job.dependencies.isEmpty, job.formal == nil, job.native == nil, job.fuzz == nil, job.policy == nil, job.toolchainIdentity == nil
                 else { throw InvarError("INVALID_PLAN","Invalid source-only model descriptor") }
             case "project":
-                guard let check = job.project, job.memoryMiB == check.budget.memoryMiB, check.id == job.id, check.approved == job.approved, check.required == job.required,
+                guard let check = job.project, job.memoryMiB == check.budget.memoryMiB, check.id == job.id, check.required == job.required,
                     job.policy == nil, job.formal == nil, job.native == nil, job.fuzz == nil, !job.inputs.isEmpty,
                     check.contracts.allSatisfy({ path in job.inputs.contains { $0.path == path } }) else { throw InvarError("INVALID_PLAN","Project job differs from its reviewed workflow") }
                 try check.validate()
-            case "static": guard let policy = job.policy, policy.id == job.id, policy.approved == job.approved, policy.required == job.required, job.formal == nil, job.native == nil, job.fuzz == nil else { throw InvarError("INVALID_PLAN", "Static job differs from its obligation", exitCode: 2) }
+            case "static": guard let policy = job.policy, policy.id == job.id, policy.required == job.required, job.formal == nil, job.native == nil, job.fuzz == nil else { throw InvarError("INVALID_PLAN", "Static job differs from its obligation", exitCode: 2) }
             case "formal":
-                guard let check = job.formal, job.memoryMiB == check.admissionMemoryMiB, check.id == job.id, check.approved == job.approved, check.required == job.required, job.policy == nil, job.native == nil, job.fuzz == nil, job.oracle != nil, job.compilation != nil else { throw InvarError("INVALID_PLAN", "Formal job differs from its obligation", exitCode: 2) }
+                guard let check = job.formal, job.memoryMiB == check.admissionMemoryMiB, check.id == job.id, check.required == job.required, job.policy == nil, job.native == nil, job.fuzz == nil, job.oracle != nil, job.compilation != nil else { throw InvarError("INVALID_PLAN", "Formal job differs from its obligation", exitCode: 2) }
                 _ = try Canonical.relative(check.source); _ = try Canonical.relative(check.specification)
             case "native":
-                guard let check = job.native, check.id == job.id, check.approved == job.approved, check.required == job.required, job.fuzz == nil, job.formal == nil, job.policy == nil else { throw InvarError("INVALID_PLAN", "Native job differs from its obligation", exitCode: 2) }
+                guard let check = job.native, check.id == job.id, check.required == job.required, job.fuzz == nil, job.formal == nil, job.policy == nil else { throw InvarError("INVALID_PLAN", "Native job differs from its obligation", exitCode: 2) }
                 try profile(check.profile)
             case "fuzz":
-                guard let check = job.fuzz, check.id == job.id, check.approved == job.approved, check.required == job.required, job.native == nil, job.formal == nil, job.policy == nil else { throw InvarError("INVALID_PLAN", "Fuzz job differs from its obligation", exitCode: 2) }
+                guard let check = job.fuzz, check.id == job.id, check.required == job.required, job.native == nil, job.formal == nil, job.policy == nil else { throw InvarError("INVALID_PLAN", "Fuzz job differs from its obligation", exitCode: 2) }
                 try profile(check.profile); _ = try Canonical.relative(check.corpus)
             default: throw InvarError("UNSUPPORTED_BACKEND", "Unknown planned backend", exitCode: 3)
             }

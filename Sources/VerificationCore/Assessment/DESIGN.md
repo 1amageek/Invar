@@ -4,7 +4,7 @@
 Own pure fail-closed assessment. Parent: [module](../DESIGN.md). No children.
 
 ## Responsibilities and Boundaries
-A run is acceptable only when every required approved obligation has matching complete adequate evidence. Preserve model-versus-source scope, no majority vote or vacuous success.
+A run is acceptable only when every required obligation has matching complete adequate evidence. Preserve model-versus-source scope, no majority vote or vacuous success.
 
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |

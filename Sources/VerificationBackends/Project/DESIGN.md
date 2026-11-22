@@ -6,27 +6,27 @@ Execute a reviewed whole-project workflow over sealed repository inputs and reta
 
 ## Responsibilities and Boundaries
 
-The Project component owns the approved-project-command/1 profile. It copies every declared captured input into an attempt-local workspace, preserves exact digests, invokes the approved argv with a bounded isolated process-session owner and records its logs. No shell command string is inferred. The reviewed executable and external tool/report-builder identities are checked before and after execution. Project code is host-trusted under separate native and user-Lean grants; this profile does not claim the native harness sandbox.
+ProjectBackend copies each captured input to an attempt-owned workspace. It runs the declared argv in a bounded isolated process session and checks the configured tool and report-builder digests before and after execution. The workflow and report builder each receive an attempt-scoped macOS sandbox. Host I/O is limited to installed runtime resources and configured tool files. The workflow writes its private copy. The builder reads that copy and writes validation output in a separate directory. Nested tools must direct their temporary files to the attempt. This includes Java runtimes used to run TLA+ checkers.
 
 ## Related Designs
 
 | Design | Relationship | Contract Used | Summary | Cautions |
 |---|---|---|---|---|
 | [VerificationBackends](../DESIGN.md) | parent | BackendContext and evidence | Composition and execution owner | No independent daemon |
-| [Provider actions](../../VerificationDaemon/ProviderActions/DESIGN.md) | caller | Original action binding | Admission and confirmation | Confirmation does not grant host authority |
+| [Provider actions](../../VerificationDaemon/ProviderActions/DESIGN.md) | caller | Original action binding | Admission and confirmation | Explorer owns confirmation |
 | [Connection](../../VerificationExplorer/Connection/DESIGN.md) | input | ProjectArchitectureReading | Complete leased files and one subject | Structural graph remains partial |
 
 ## Architecture
 
 ```text
-Sealed files + approved argv -> attempt workspace -> workflow receipts
+Sealed files + declared argv -> attempt workspace -> workflow receipts
     -> pinned report builder -> validated report + retained evidence archive
     -> publisher -> original Map subject / report Canvas
 ```
 
 ## Contracts and Invariants
 
-The [workflow contract](../../../plugins/invar/SPEC.md#project-workflow-gates) adds schema-2 requirement/production inventories, typed checker activities, named obligations, exact source/model bindings and five reviewed gates. The report builder derives gate status and earliest return stage; it cannot promote generation to checking. Native ProjectReportAssessment independently rejects missing claim references, workflow/review records or a verdict inconsistent with evidence. Reviews are hash-bound Agent attestations, not formal proof or execution authority. The report builder and checker producers remain host-trusted.
+The [workflow contract](../../../plugins/invar/SPEC.md#project-workflow-gates) adds schema-2 requirement/production inventories, typed checker activities, named obligations, exact source/model bindings and five reviewed gates. The report builder derives gate status and earliest return stage; it cannot promote generation to checking. Native ProjectReportAssessment independently rejects missing claim references, workflow/review records or a verdict inconsistent with evidence. Reviews are hash-bound Agent attestations. Formal claims require checker evidence.
 
 ```text
 requirements -> specification -> implementation -> correspondence -> integration
@@ -49,4 +49,4 @@ There is no shared mutable stored state or platform conditional in this componen
 
 ## Verification and Change Impact
 
-Tests exercise real subprocess execution with nontrivial specification/code/correspondence outcomes, failure/timeout, changed inputs, receipt tampering, tool identity, subject binding and publication. UI checks exercise immediate destination, exact report, Back and absence of constant Map controls.
+Tests exercise sandbox denial outside the attempt, real subprocess execution with nontrivial specification/code/correspondence outcomes, failure/timeout, changed inputs, receipt tampering, tool identity, subject binding and publication. UI checks exercise immediate destination, exact report, Back and absence of constant Map controls.

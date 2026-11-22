@@ -9,29 +9,14 @@ import VerificationDaemon
 @Suite(.timeLimit(.minutes(1))) struct ClientSessionTests {
     actor Server: DaemonRequestHandling {
         let workspace = "workspace", epoch = UUID().uuidString
-        let credential = UUID().uuidString + UUID().uuidString
-        let resume = UUID().uuidString + UUID().uuidString
-        var dropAcceptance = false, blockStatus = false, blockRenewal = false
-        var openings = 0, acceptances = 0, statusReads = 0
-        var auditIdentity: String?
-        var granted: [WorkspaceCapability] = []
+        var dropAcceptance = false, blockStatus = false
+        var acceptances = 0, statusReads = 0
         var envelopes: [String:RequestEnvelope] = [:]
         var receipts: [String:OperationReceipt] = [:]
         init(dropAcceptance: Bool = false,blockStatus: Bool = false) { self.dropAcceptance = dropAcceptance; self.blockStatus = blockStatus }
-        func holdRenewal() { blockRenewal = true }
-        func handle(_ request: JSONValue,peer: ConnectionPeer,channel: DaemonRPCChannel) async throws -> JSONValue? {
-            guard request["protocolVersion"].int == 2, request["workspaceID"].string == workspace else { throw InvarError("PROTOCOL_MISMATCH","Wrong fixture workspace/protocol") }
+        func handle(_ request: JSONValue,channel: DaemonRPCChannel) async throws -> JSONValue? {
+            guard request["protocolVersion"].int == 3, request["workspaceID"].string == workspace else { throw InvarError("PROTOCOL_MISMATCH","Wrong fixture workspace/protocol") }
             let result: JSONValue, body = request["body"]
-            if request["method"].string == "session.open" {
-                openings += 1
-                if openings > 1, blockRenewal { try await Task.sleep(for: .seconds(30)) }
-                auditIdentity = peer.auditIdentity
-                let desired = Set(body["capabilities"].array.compactMap(\.string))
-                granted = desired.intersection(["read","verification"]).compactMap(WorkspaceCapability.init(rawValue:))
-                let session = AgentSession(id: "session",principal: "authenticated-principal",agentLabel: body["label"].string,grants: desired.intersection(["read","verification"]).sorted(),policyRevision: 1,expiresAt: Date().timeIntervalSince1970 + 60)
-                result = try JSONValue.encode(ClientSessionGrant(workspaceID: workspace,epoch: epoch,engineIdentity: String(repeating: "0",count: 64),session: session,credential: credential,resumeCredential: resume))
-            } else {
-                guard request["credential"].string == credential, request["epoch"].string == epoch, peer.auditIdentity == auditIdentity else { throw InvarError("AUTHENTICATION_REQUIRED","Credential is not bound to this actual peer") }
                 switch request["method"].string {
                 case "request.prepare":
                     let operation = try body["operation"].decode(WorkspaceOperation.self)
@@ -40,7 +25,7 @@ import VerificationDaemon
                     if let existing = envelopes[key] { value = existing }
                     else {
                         let now = Date().timeIntervalSince1970
-                        value = RequestEnvelope(id: UUID().uuidString,sessionID: "session",capabilities: granted,requestKey: key,principal: "authenticated-principal",workspaceID: workspace,fingerprint: try Canonical.identity(operation),operation: operation.name,daemonEpoch: epoch,policyRevision: 1,expiresAt: now+20,retainUntil: now+60)
+                        value = RequestEnvelope(id: UUID().uuidString,requestKey: key,principal: "local",workspaceID: workspace,fingerprint: try Canonical.identity(operation),operation: operation.name,daemonEpoch: epoch,expiresAt: now+20,retainUntil: now+60)
                         envelopes[key] = value
                     }
                     result = try JSONValue.encode(value)
@@ -61,13 +46,12 @@ import VerificationDaemon
                     case .receipt(let id): result = try JSONValue.encode(receipts[id])
                     case .status:
                         statusReads += 1
-                        if blockStatus { try await Task.sleep(for: .seconds(30)) }
-                        result = try JSONValue.encode(DaemonStatus(workspaceID: workspace,epoch: epoch,engineIdentity: String(repeating: "0",count: 64),policyRevision: 1,state: "ready",activeOperations: 0,watchCount: 0,diagnostics: []))
+                        if blockStatus && statusReads > 1 { try await Task.sleep(for: .seconds(30)) }
+                        result = try JSONValue.encode(DaemonStatus(workspaceID: workspace,epoch: epoch,engineIdentity: String(repeating: "0",count: 64),state: "ready",activeOperations: 0,watchCount: 0,diagnostics: []))
                     default: throw InvarError("UNSUPPORTED_OPERATION","Fixture query is outside the transport test")
                     }
                 default: throw InvarError("METHOD_NOT_FOUND","Unknown fixture method")
                 }
-            }
             return result
         }
     }
@@ -75,7 +59,7 @@ import VerificationDaemon
         let path = URL(fileURLWithPath: "/tmp/invar-client-" + String(UUID().uuidString.prefix(8)))
         try FileManager.default.createDirectory(at: path,withIntermediateDirectories: false,attributes: [.posixPermissions: 0o700]); return path
     }
-    @Test func actualSocketChecksServerBeforeSendingSecretsAndBindsSessionGrants() async throws {
+    @Test func localSocketChecksWorkspaceAndEngine() async throws {
         let root = try root(), path = root.appendingPathComponent("daemon.sock").path
         let server = Server()
         let transport = try DaemonRPCServer(socket: URL(fileURLWithPath: path),channel: .control,maximumConnections: 8,handler: server)
@@ -87,18 +71,11 @@ import VerificationDaemon
             do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) }
         }
         let peer = try ConnectionPeer.current()
-        let wrong = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: String(repeating: "f",count: 64),serverCodeIdentity: peer.codeIdentity,engineIdentity: String(repeating: "0",count: 64))
-        await #expect(throws: InvarError.self) { try await LocalVerificationClient.connect(endpoint: wrong,capabilities: [.read]) }
-        #expect(await server.openings == 0)
-        let wrongCode = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: "another-signed-code-identity",engineIdentity: String(repeating: "0",count: 64))
-        await #expect(throws: InvarError.self) { try await LocalVerificationClient.connect(endpoint: wrongCode,capabilities: [.read]) }
-        #expect(await server.openings == 0)
         let wrongEngine = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: String(repeating: "1",count: 64))
-        await #expect(throws: InvarError.self) { try await LocalVerificationClient.connect(endpoint: wrongEngine,capabilities: [.read]) }
+        await #expect(throws: InvarError.self) { try await LocalVerificationClient.connect(endpoint: wrongEngine) }
         #expect(await server.acceptances == 0)
         let endpoint = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: String(repeating: "0",count: 64))
-        let client = try await LocalVerificationClient.connect(endpoint: endpoint,label: "descriptive only",capabilities: [.read,.verification,.nativeExecution])
-        #expect(try await client.session().grants == ["read","verification"])
+        let client = try await LocalVerificationClient.connect(endpoint: endpoint)
         #expect(try await client.status().state == "ready")
         let receipt = try await client.verify(planID: String(repeating: "1",count: 64),changeRevisionID: nil,replayOfRunID: nil,key: "once",timeout: 20)
         #expect(try await client.receipt(envelopeID: receipt.id) == receipt)
@@ -118,7 +95,7 @@ import VerificationDaemon
             do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) }
         }
         let peer = try ConnectionPeer.current(), endpoint = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: String(repeating: "0",count: 64))
-        let client = try await LocalVerificationClient.connect(endpoint: endpoint,capabilities: [.read,.verification])
+        let client = try await LocalVerificationClient.connect(endpoint: endpoint)
         let operation = WorkspaceOperation.verify(planID: String(repeating: "1",count: 64),changeRevisionID: nil,replayOfRunID: nil)
         let prepared = try await client.prepare(operation,key: "fixed",timeout: 20)
         do { _ = try await client.accept(prepared); Issue.record("Lost ACK became success") }
@@ -139,42 +116,15 @@ import VerificationDaemon
             do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) }
         }
         let peer = try ConnectionPeer.current(), endpoint = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: String(repeating: "0",count: 64))
-        let client = try await LocalVerificationClient.connect(endpoint: endpoint,capabilities: [.read])
+        let client = try await LocalVerificationClient.connect(endpoint: endpoint)
         let call = Task { try await client.status() }
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while await server.statusReads == 0 {
+        while await server.statusReads < 2 {
             guard ContinuousClock.now < deadline else { throw InvarError("TEST_DEADLINE","Socket query did not start") }
             try await Task.sleep(for: .milliseconds(2))
         }
         await client.shutdown()
         do { _ = try await call.value; Issue.record("Closed pending call became success") } catch { #expect(error is InvarError) }
-    }
-    @Test func shutdownDrainsAnOwnedPendingSessionRenewalWithoutRestoringClosedCredentials() async throws {
-        let root = try root(), path = root.appendingPathComponent("daemon.sock").path, server = Server()
-        let transport = try DaemonRPCServer(socket: URL(fileURLWithPath: path),channel: .control,maximumConnections: 8,handler: server)
-        let serving = Task { try await transport.serve() }
-        defer {
-            do { try await transport.shutdown() } catch { Issue.record(error) }
-            serving.cancel()
-            do { try await serving.value } catch is CancellationError {} catch { Issue.record(error) }
-            do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) }
-        }
-        let peer = try ConnectionPeer.current()
-        let endpoint = LocalDaemonEndpoint(workspaceID: "workspace",socketPath: path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: String(repeating: "0",count: 64))
-        let client = try await LocalVerificationClient.connect(endpoint: endpoint,capabilities: [.read])
-        await server.holdRenewal()
-        let renewal = Task { try await client.refreshSession() }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while await server.openings < 2 {
-            guard ContinuousClock.now < deadline else { throw InvarError("TEST_DEADLINE","Session renewal did not reach the socket handler") }
-            try await Task.sleep(for: .milliseconds(2))
-        }
-        let start = ContinuousClock.now
-        await client.shutdown()
-        #expect(start.duration(to: .now) < .seconds(1))
-        do { _ = try await renewal.value; Issue.record("Closed client restored a renewed session") }
-        catch is InvarError {}
-        await #expect(throws: InvarError.self) { try await client.session() }
     }
 
 }

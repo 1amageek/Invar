@@ -2,24 +2,16 @@ import Foundation
 import VerificationCore
 
 extension SQLiteVerificationStore {
-    public func authorizeWatch(_ id: String) throws {
-        try ensureAccepting()
-        let watch = try loadWatch(id)
-        guard watch.state == "active" else { throw InvarError("POLICY_DENIED","Watch is not active",exitCode: 8) }
-        _ = try watchAuthority(watch)
-    }
     public func issueWatchEnvelope(watchID: String,operation: WorkspaceOperation,epoch: String,now: Double) throws -> RequestEnvelope {
         try ensureAccepting()
         return try transaction {
             let watch = try loadWatch(watchID)
-            _ = try watchAuthority(watch)
             try validateWatchOperation(watch,operation: operation)
-            guard let host = try loadPolicy() else { throw InvarError("POLICY_DENIED","Watch host policy is unavailable",exitCode: 8) }
             let key = WatchRequestIdentity.key(watchID: watch.id,generation: watch.cycle.generation,operation: operation.name)
             let id = WatchRequestIdentity.envelopeID(watchID: watch.id,generation: watch.cycle.generation,operation: operation.name)
-            let expiry = min(now+min(watch.budget.runTimeoutSeconds,host.maximumEnvelopeSeconds),watch.expiresAt)
+            let expiry = min(now+min(watch.budget.runTimeoutSeconds,policy.retentionSeconds),watch.expiresAt)
             let fingerprint = try Canonical.identity(operation)
-            let proposed = RequestEnvelope(id: id,watchID: watch.id,capabilities: watch.capabilities,requestKey: key,principal: watch.principal,workspaceID: watch.workspaceID,fingerprint: fingerprint,operation: operation.name,daemonEpoch: epoch,policyRevision: watch.policyRevision,expiresAt: expiry,retainUntil: now+policy.retentionSeconds)
+            let proposed = RequestEnvelope(id: id,watchID: watch.id,requestKey: key,principal: watch.principal,workspaceID: watch.workspaceID,fingerprint: fingerprint,operation: operation.name,daemonEpoch: epoch,expiresAt: expiry,retainUntil: now+policy.retentionSeconds)
             try validateEnvelopeLifetime(proposed,now: now)
             let envelope = try insertEnvelope(proposed,now: now)
             try validateWatchRequest(envelope,operation: operation,now: now)
@@ -30,16 +22,15 @@ extension SQLiteVerificationStore {
     }
     public func validateWatchRequest(_ envelope: RequestEnvelope,operation: WorkspaceOperation,now: Double) throws {
         try ensureAccepting()
-        guard now.isFinite, let id = envelope.watchID, envelope.sessionID == nil, envelope.expiresAt > now else { throw InvarError("POLICY_DENIED","Watch envelope has no fixed unexpired owner",exitCode: 8) }
+        guard now.isFinite, let id = envelope.watchID, envelope.expiresAt > now else { throw InvarError("POLICY_DENIED","Watch envelope has no fixed unexpired owner",exitCode: 8) }
         let watch = try loadWatch(id)
-        _ = try watchAuthority(watch)
         try validateWatchOperation(watch,operation: operation)
         let original = try loadEnvelope(envelope.id), fingerprint = try Canonical.identity(operation)
         let expectedID = WatchRequestIdentity.envelopeID(watchID: watch.id,generation: watch.cycle.generation,operation: operation.name)
         let demandID = Canonical.parts("invar.operation/2",[envelope.id])
         guard original == envelope, envelope.id == expectedID, envelope.fingerprint == fingerprint, envelope.operation == operation.name,
-            envelope.principal == watch.principal, envelope.workspaceID == watch.workspaceID, envelope.policyRevision == watch.policyRevision,
-            Set(envelope.capabilities) == Set(watch.capabilities), envelope.expiresAt <= watch.expiresAt,
+            envelope.principal == watch.principal, envelope.workspaceID == watch.workspaceID,
+            envelope.expiresAt <= watch.expiresAt,
             watch.cycle.pendingDemandID == nil || watch.cycle.pendingDemandID == demandID else { throw InvarError("POLICY_DENIED","Watch request differs from its original stage/authority",exitCode: 8) }
     }
     private func validateWatchOperation(_ value: WatchRecord,operation: WorkspaceOperation) throws {

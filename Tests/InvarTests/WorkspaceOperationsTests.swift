@@ -21,7 +21,6 @@ import VerificationStore
     func demand(_ operation: WorkspaceOperation,principal: String = "agent") -> RunDemand {
         RunDemand(id: UUID().uuidString,envelopeID: "fixture",principal: principal,origin: "unit-fixture",request: operation,planID: nil,changeRevisionID: nil,state: "running",revision: 2,executionIDs: [],resultID: nil,failure: nil)
     }
-    func authority(_ principal: String = "agent") -> OperationAuthority { OperationAuthority(principal: principal,policyRevision: 1,capabilities: [.changes,.planning]) }
     @Test func principalOwnedSealAndHistoricalPreparationUseCapturedContractsAfterLiveRemoval() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("invar-operations-" + UUID().uuidString)
         let workspace = root.appendingPathComponent("workspace")
@@ -34,22 +33,21 @@ import VerificationStore
         try await store.activateEpoch(epoch,engineIdentity: engine)
         let operations = WorkspaceOperations(source: source,repository: store,resources: pool,workspace: workspace,workspaceID: source.workspaceID,epoch: epoch,engineIdentity: engine,defaultConfigurationPath: "contracts.json",scratchFiles: 1000)
         let claim = ChangeClaim(intent: "Update value",paths: ["Code.swift"],entityIDs: [],patchDigest: nil,expectedFiles: [])
-        let first = try await operations.execute(demand(.openChange(claim: claim)),authority: authority())
+        let first = try await operations.execute(demand(.openChange(claim: claim)))
         let baseline = try await store.loadChange(first)
         #expect(baseline.ownerPrincipal == "agent" && baseline.state == "open")
         let count = await source.captures
-        await #expect(throws: InvarError.self) { try await operations.execute(demand(.sealChange(changeID: first),principal: "other"),authority: authority("other")) }
         #expect(await source.captures == count)
-        _ = try await operations.execute(demand(.openChange(claim: claim)),authority: authority())
+        _ = try await operations.execute(demand(.openChange(claim: claim)))
         await source.update()
-        let revisionID = try await operations.execute(demand(.sealChange(changeID: first)),authority: authority())
+        let revisionID = try await operations.execute(demand(.sealChange(changeID: first)))
         let revision = try await store.loadChangeRevision(revisionID)
         #expect(revision.before == baseline.baseline && revision.after != baseline.baseline)
         #expect(revision.delta.files.map(\.path) == ["Code.swift"])
         #expect(revision.attribution.kind == "overlapping")
-        #expect(try await operations.execute(demand(.sealChange(changeID: first)),authority: authority()) == revisionID)
+        #expect(try await operations.execute(demand(.sealChange(changeID: first))) == revisionID)
         try FileManager.default.removeItem(at: configPath)
-        let id = try await operations.execute(demand(.preparePlan(configurationPath: "contracts.json",changeRevisionID: revisionID,budget: RunBudget())),authority: authority())
+        let id = try await operations.execute(demand(.preparePlan(configurationPath: "contracts.json",changeRevisionID: revisionID,budget: RunBudget())))
         let plan = try await store.schedulingPlan(id)
         let expectedConfigurationDigest = try config.identity()
         #expect(plan.input == revision.after && plan.configurationDigest == expectedConfigurationDigest)
@@ -67,7 +65,7 @@ import VerificationStore
         try FileManager.default.createSymbolicLink(at: workspace.appendingPathComponent("link"),withDestinationURL: outside)
         let store = try SQLiteVerificationStore(root: root.appendingPathComponent("state")), source = Source(), pool = ResourcePool(policy: .development)
         let operations = WorkspaceOperations(source: source,repository: store,resources: pool,workspace: workspace,workspaceID: source.workspaceID,epoch: "epoch",engineIdentity: String(repeating: "0",count: 64),defaultConfigurationPath: nil,scratchFiles: 1000)
-        await #expect(throws: InvarError.self) { try await operations.execute(demand(.openChange(claim: nil,configurationPath: "link/contracts.json")),authority: authority()) }
+        await #expect(throws: InvarError.self) { try await operations.execute(demand(.openChange(claim: nil,configurationPath: "link/contracts.json"))) }
         #expect(await source.captures == 0)
         #expect(try await store.openChanges(workspaceID: source.workspaceID).isEmpty)
         await operations.shutdown(); await pool.shutdown(); try await store.shutdown(); try FileManager.default.removeItem(at: root)
@@ -92,14 +90,14 @@ extension WorkspaceOperationsTests {
         let source = Program(), engine = String(repeating: "0",count: 64), epoch = UUID().uuidString
         let oracle = Data(#"{"schemaVersion":1,"fuel":64,"cases":[{"name":"positive","entry":"compute","arguments":["2"],"expected":{"status":"returned","value":"3"}}]}"#.utf8)
         try oracle.write(to: workspace.appendingPathComponent("oracle.json"))
-        let check = FormalCheck(id: "formal",source: "Code.swift",mode: "finite",specification: "oracle.json",toolchain: root.appendingPathComponent("explicitly-unavailable-tools").path,approved: true,memoryMiB: 4096)
+        let check = FormalCheck(id: "formal",source: "Code.swift",mode: "finite",specification: "oracle.json",toolchain: root.appendingPathComponent("explicitly-unavailable-tools").path,memoryMiB: 4096)
         let configuration = VerificationConfiguration(formal: [check]), configurationBytes = try Canonical.encode(configuration)
         try configurationBytes.write(to: workspace.appendingPathComponent("contracts.json"))
         let store = try SQLiteVerificationStore(root: root.appendingPathComponent("state")), pool = ResourcePool(policy: .development)
         try await store.activateEpoch(epoch,engineIdentity: engine)
         let operations = WorkspaceOperations(source: source,repository: store,resources: pool,workspace: workspace,workspaceID: "workspace",epoch: epoch,engineIdentity: engine,defaultConfigurationPath: nil,scratchFiles: 1000)
         let request = demand(.preparePlan(configurationPath: "contracts.json",changeRevisionID: nil,budget: RunBudget()))
-        let id = try await operations.execute(request,authority: authority())
+        let id = try await operations.execute(request)
         let plan = try await store.loadPlan(id), job = try #require(plan.body.jobs.first), unit = try #require(job.compilation)
         #expect(unit.sourceDigest == Canonical.digest(source.bytes))
         #expect(try await store.loadPreparation(unit.id) == unit)

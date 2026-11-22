@@ -5,22 +5,13 @@ import VerificationRuntime
 import VerificationStore
 
 @Suite(.timeLimit(.minutes(1))) struct DurableCoordinatorTests {
-    actor Authorization: WorkspaceAuthorizationChecking {
-        var revision = 1
-        func authority(principal: String,operation: WorkspaceOperation,policyRevision: Int,capabilityCeiling: Set<WorkspaceCapability>?) throws -> OperationAuthority {
-            guard revision == policyRevision else { throw InvarError("POLICY_DENIED","Policy was revoked",exitCode: 8) }
-            let allowed: Set<WorkspaceCapability> = [.read,.verification]
-            return OperationAuthority(principal: principal,policyRevision: revision,capabilities: capabilityCeiling.map { allowed.intersection($0) } ?? allowed)
-        }
-        func revoke() { revision += 1 }
-    }
     struct Operations: WorkspaceOperationExecuting {
-        func execute(_ demand: RunDemand,authority: OperationAuthority) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","This fixture exposes verification only") }
+        func execute(_ demand: RunDemand) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","This fixture exposes verification only") }
     }
     func request(store: SQLiteVerificationStore,plan: VerificationPlan,epoch: String,key: String,principal: String = "agent") async throws -> (RequestEnvelope,WorkspaceOperation) {
         let operation = WorkspaceOperation.verify(planID: plan.id,changeRevisionID: nil,replayOfRunID: nil)
         let now = Date().timeIntervalSince1970
-        let envelope = RequestEnvelope(id: UUID().uuidString,requestKey: key,principal: principal,workspaceID: plan.body.input.workspaceID,fingerprint: try Canonical.identity(operation),operation: operation.name,daemonEpoch: epoch,policyRevision: 1,expiresAt: now+20,retainUntil: now+30)
+        let envelope = RequestEnvelope(id: UUID().uuidString,requestKey: key,principal: principal,workspaceID: plan.body.input.workspaceID,fingerprint: try Canonical.identity(operation),operation: operation.name,daemonEpoch: epoch,expiresAt: now+20,retainUntil: now+30)
         return (try await store.issueEnvelope(envelope,now: now),operation)
     }
     func wait(_ id: String,coordinator: WorkspaceCoordinator,principal: String = "agent") async throws -> RunDemand {
@@ -38,7 +29,7 @@ import VerificationStore
         try await store.activateEpoch(epoch,engineIdentity: String(repeating: "1",count: 64))
         _ = try await store.observeInput(plan.body.input,epoch: epoch)
         let probe = SharedSchedulingTests.Probe(), scheduler = VerificationScheduler(backend: probe,repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: Authorization(),operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
         let (envelope,operation) = try await request(store: store,plan: plan,epoch: epoch,key: "once")
         let receipts = try await withThrowingTaskGroup(of: OperationReceipt.self) { group in
             for _ in 0..<20 { group.addTask { try await coordinator.submit(envelope,operation: operation) } }
@@ -68,7 +59,7 @@ import VerificationStore
         let epoch = UUID().uuidString
         try await store.activateEpoch(epoch,engineIdentity: String(repeating: "1",count: 64))
         let probe = SharedSchedulingTests.Probe(), scheduler = VerificationScheduler(backend: probe,repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: Authorization(),operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
         let (a,operation) = try await request(store: store,plan: plan,epoch: epoch,key: "a",principal: "agent-a")
         let (b,_) = try await request(store: store,plan: plan,epoch: epoch,key: "b",principal: "agent-b")
         let first = try await coordinator.submit(a,operation: operation), second = try await coordinator.submit(b,operation: operation)
@@ -82,17 +73,15 @@ import VerificationStore
         #expect(await probe.count("shared") == 1); #expect(await probe.cancelled == 0)
         try await coordinator.shutdown(); try await store.shutdown(); try FileManager.default.removeItem(at: root)
     }
-    @Test func typedFingerprintAndRevokedAuthorityCannotStartAnotherOperation() async throws {
+    @Test func typedFingerprintCannotStartAnotherOperation() async throws {
         let (store,plan,root) = try await SchedulerTests.setup(jobs: [SchedulerTests.job("a")])
         let epoch = UUID().uuidString
         try await store.activateEpoch(epoch,engineIdentity: String(repeating: "1",count: 64))
-        let authority = Authorization(), probe = SharedSchedulingTests.Probe()
+        let probe = SharedSchedulingTests.Probe()
         let scheduler = VerificationScheduler(backend: probe,repository: store)
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: authority,operations: Operations(),epoch: epoch,maximumDemands: 8)
-        let (envelope,operation) = try await request(store: store,plan: plan,epoch: epoch,key: "a")
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let (envelope,_) = try await request(store: store,plan: plan,epoch: epoch,key: "a")
         await #expect(throws: InvarError.self) { try await coordinator.submit(envelope,operation: .verify(planID: plan.id,changeRevisionID: nil,replayOfRunID: "other")) }
-        await authority.revoke()
-        await #expect(throws: InvarError.self) { try await coordinator.submit(envelope,operation: operation) }
         #expect(try await store.loadReceipt(envelope.id) == nil); #expect(await probe.count("a") == 0)
         try await coordinator.shutdown(); try await store.shutdown(); try FileManager.default.removeItem(at: root)
     }
@@ -113,9 +102,9 @@ extension DurableCoordinatorTests {
         _ = try await store.acceptDemand(startedEnvelope,demand: started,now: Date().timeIntervalSince1970)
         try await store.transitionDemand(started.transitioning(to: "running"),expectedRevision: 1)
         let now = Date().timeIntervalSince1970
-        let providerEnvelope = RequestEnvelope(id: "external-receipt",sessionID: "provider-session",capabilities: [.verification],requestKey: "provider-request",principal: "provider",workspaceID: plan.body.input.workspaceID,fingerprint: queuedEnvelope.fingerprint,operation: operation.name,daemonEpoch: oldEpoch,policyRevision: 1,expiresAt: now+60,retainUntil: now+120)
+        let providerEnvelope = RequestEnvelope(id: "external-receipt",requestKey: "provider-request",principal: "provider",workspaceID: plan.body.input.workspaceID,fingerprint: queuedEnvelope.fingerprint,operation: operation.name,daemonEpoch: oldEpoch,expiresAt: now+60,retainUntil: now+120)
         _ = try await store.issueEnvelope(providerEnvelope,now: now)
-        let base = ProviderActionRegistration(id: "provider-action",envelope: providerEnvelope,operation: operation,input: plan.body.input,sourceFingerprint: String(repeating: "1",count: 64),intent: Data(),authority: Data(),runRequestID: "original-run",run: Data(),expiresAt: now+120)
+        let base = ProviderActionRegistration(id: "provider-action",envelope: providerEnvelope,operation: operation,input: plan.body.input,sourceFingerprint: String(repeating: "1",count: 64),intent: Data(),runRequestID: "original-run",run: Data(),expiresAt: now+120)
         try await store.createProviderAction(base)
         try await store.saveProviderActionState(ProviderActionState(id: base.id).revising(state: "accepted",jobID: "external-demand"),expectedRevision: 1)
         let external = RunDemand(id: "external-demand",envelopeID: providerEnvelope.id,principal: "provider",origin: "provider",request: operation,planID: plan.id,changeRevisionID: nil,state: "queued",revision: 1,executionIDs: [],resultID: nil,failure: nil)
@@ -125,7 +114,7 @@ extension DurableCoordinatorTests {
         let reopened = try SQLiteVerificationStore(root: root), epoch = UUID().uuidString
         try await reopened.activateEpoch(epoch,engineIdentity: engine)
         let probe = SharedSchedulingTests.Probe(), scheduler = VerificationScheduler(backend: probe,repository: reopened,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: reopened,scheduler: scheduler,authorization: Authorization(),operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: reopened,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
         try await coordinator.recover()
         let resumed = try await wait(queuedID,coordinator: coordinator)
         #expect(resumed.state == "completed")
@@ -157,7 +146,7 @@ extension DurableCoordinatorTests {
         try await store.activateEpoch(epoch,engineIdentity: String(repeating: "1",count: 64))
         let probe = InterestProbe(store: store)
         let scheduler = VerificationScheduler(backend: probe,repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: Authorization(),operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
         let (a,operation) = try await request(store: store,plan: plan,epoch: epoch,key: "early-a")
         let first = try await coordinator.submit(a,operation: operation)
         let (b,_) = try await request(store: store,plan: plan,epoch: epoch,key: "early-b")
@@ -197,8 +186,7 @@ extension DurableCoordinatorTests {
         init(store: SQLiteVerificationStore) { self.store = store }
         func execute(_ context: BackendContext) async throws -> VerificationEvidence {
             for _ in 0..<128 {
-                let session = AgentSession(id: UUID().uuidString,principal: "quota-fixture",agentLabel: nil,grants: [],policyRevision: 1,expiresAt: 1)
-                do { try await store.saveAgentSession(session) }
+                do { try await store.saveEvidence(VerificationEvidence(inputID: context.descriptor.input.id,jobID: UUID().uuidString,execution: "completed",outcome: "unknown",domain: "architecture",translation: "notApplicable",scope: "Quota fixture",detail: "Fill ordinary record capacity",startedAt: "fixture",finishedAt: "fixture")) }
                 catch let error as InvarError where error.code == "STORE_QUOTA" { exhausted = true; break }
             }
             guard exhausted else { throw InvarError("TEST_PRECONDITION","Fixture did not exhaust ordinary record capacity") }
@@ -217,7 +205,7 @@ extension DurableCoordinatorTests {
         let smallPlan = VerificationPlan(id: try Canonical.identity(body),body: body)
         try await store.savePlan(smallPlan)
         let scheduler = VerificationScheduler(backend: probe,repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"),policy: schedulingPolicy)
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: Authorization(),operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
         let (envelope,operation) = try await request(store: store,plan: smallPlan,epoch: epoch,key: "full")
         let receipt = try await coordinator.submit(envelope,operation: operation)
         let terminal = try await wait(receipt.operationID,coordinator: coordinator)
@@ -247,9 +235,8 @@ extension DurableCoordinatorTests {
         let epoch = UUID().uuidString
         try await store.activateEpoch(epoch,engineIdentity: String(repeating: "1",count: 64))
         let probe = SharedSchedulingTests.Probe(), scheduler = VerificationScheduler(backend: probe,repository: store)
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: Authorization(),operations: Operations(),epoch: epoch,maximumDemands: 8,acceptingRequests: false)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8,acceptingRequests: false)
         let (envelope,operation) = try await request(store: store,plan: plan,epoch: epoch,key: "gated")
-        await #expect(throws: InvarError.self) { try await coordinator.submit(envelope,operation: operation) }
         #expect(try await store.loadReceipt(envelope.id) == nil)
         #expect(await probe.count("a") == 0)
         try await coordinator.openAdmission()

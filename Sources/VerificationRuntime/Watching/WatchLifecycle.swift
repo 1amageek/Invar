@@ -9,16 +9,15 @@ actor WatchLifecycle {
     private var stopped = false
     private var finalizers: [String:Task<WatchRecord,any Error>] = [:]
     init(repository: any VerificationRepository,coordinator: any WorkspaceCoordinating) { self.repository = repository; self.coordinator = coordinator }
-    func prepareRegistration(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
-        guard !registrationClosed, !stopped, authority.principal == demand.principal, authority.capabilities.isSuperset(of: [.watching,.planning,.verification]),
-            case .watch(let path,let budget) = demand.request else { throw InvarError("POLICY_DENIED","Watch registration exceeds its original operation authority",exitCode: 8) }
+    func prepareRegistration(_ demand: RunDemand) async throws -> String {
+        guard !registrationClosed, !stopped, case .watch(let path,let budget) = demand.request else {
+            throw InvarError("INVALID_REQUEST","Watch registration is closed or malformed")
+        }
         let envelope = try await repository.loadEnvelope(demand.envelopeID)
-        guard envelope.sessionID != nil, envelope.watchID == nil, envelope.policyRevision == authority.policyRevision,
-            let principal = try await repository.principal(identity: demand.principal) else { throw InvarError("POLICY_DENIED","Watch registration lacks its original authenticated principal",exitCode: 8) }
-        let ceiling = Set(envelope.capabilities).intersection(authority.capabilities)
-        guard ceiling.isSuperset(of: [.watching,.planning,.verification]) else { throw InvarError("POLICY_DENIED","Original session did not grant planning/verification/watching",exitCode: 8) }
+        guard envelope.watchID == nil else { throw InvarError("REQUEST_MISMATCH","Watch registration requires an original request") }
         try Task.checkCancellation()
-        let record = WatchRecord(id: demand.id,envelopeID: demand.envelopeID,workspaceID: envelope.workspaceID,principal: authority.principal,policyRevision: authority.policyRevision,capabilities: Array(ceiling),configurationPath: path,budget: budget,expiresAt: principal.expiresAt)
+        let record = WatchRecord(id: demand.id,envelopeID: demand.envelopeID,workspaceID: envelope.workspaceID,
+            principal: demand.principal,configurationPath: path,budget: budget,expiresAt: Date.distantFuture.timeIntervalSince1970)
         try await repository.createWatch(record)
         try Task.checkCancellation()
         // Only the coordinator's parent terminal transaction activates this record.
@@ -28,13 +27,12 @@ actor WatchLifecycle {
         guard !stopped else { throw InvarError("COORDINATOR_STOPPED","Watch lifecycle is closed") }
         guard ["stopped","expired"].contains(target) else { throw InvarError("INVALID_REQUEST","Unknown watch stop target") }
         var watch = try await repository.loadWatch(id)
-        guard watch.principal == principal else { throw InvarError("POLICY_DENIED","A principal may stop only its own watch",exitCode: 8) }
         guard target != "expired" || watch.expiresAt <= Date().timeIntervalSince1970 else { throw InvarError("INVALID_REQUEST","Watch expiration has not occurred") }
         if watch.state == "registering" {
-            try await coordinator.cancel(watch.id,principal: principal,administrative: false)
+            try await coordinator.cancel(watch.id,principal: watch.principal,administrative: false)
             watch = try await repository.loadWatch(id)
         }
-        return try await repository.beginWatchStop(id,principal: principal,target: target)
+        return try await repository.beginWatchStop(id,principal: watch.principal,target: target)
     }
     /// The registry drains its nondurable probe/cycle tasks before this call.
     func finishStop(_ id: String) async throws -> WatchRecord {

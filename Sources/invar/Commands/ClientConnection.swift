@@ -15,9 +15,6 @@ struct ClientConnection {
         let admin = LocalDaemonAdministration(paths: paths)
         defer { await admin.shutdown() }
         let endpoint = try await admin.endpoint()
-        let directory = options.values["client-state"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".invar-clients")
-        let profile = try LocalClientProfile(directory: directory,profile: options.values["client-profile"] ?? "default",workspace: options.workspace,workspaceID: workspace.workspaceID,daemonState: paths.stateDirectory)
-        let capabilities = try options.capabilities()
-        return try await profile.connect(endpoint: endpoint,label: "invar " + options.command,capabilities: capabilities)
+        return try await LocalVerificationClient.connect(endpoint: endpoint)
     }
 }

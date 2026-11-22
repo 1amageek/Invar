@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol VerificationRepository: ChangeRepository, ExecutionLedger, EvidenceRepository, RetentionManaging, PolicyRepository, PublicationRepository, WatchRepository, ProviderActionRepository {
+public protocol VerificationRepository: ChangeRepository, ExecutionLedger, EvidenceRepository, RetentionManaging, PublicationRepository, WatchRepository, ProviderActionRepository {
     func saveInput(_ capture: CapturedWorkspace) async throws -> String
     func inputReference(_ id: String) async throws -> VerificationInput
     func inputLocation(_ input: VerificationInput) async throws -> URL

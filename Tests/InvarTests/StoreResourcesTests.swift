@@ -174,7 +174,7 @@ extension StoreResourcesTests {
         _ = try await store.acceptDemand(envelope,demand: demand,now: Date().timeIntervalSince1970)
         var full = false
         for _ in 0..<128 {
-            do { try await store.saveAgentSession(AgentSession(id: UUID().uuidString,principal: "filler",agentLabel: nil,grants: [],policyRevision: 1,expiresAt: 1)) }
+            do { try await store.saveEvidence(VerificationEvidence(inputID: plan.body.input.id,jobID: UUID().uuidString,execution: "completed",outcome: "unknown",domain: "architecture",translation: "notApplicable",scope: "Quota fixture",detail: "Fill ordinary record capacity",startedAt: "fixture",finishedAt: "fixture")) }
             catch let error as InvarError where error.code == "STORE_QUOTA" { full = true; break }
         }
         #expect(full)

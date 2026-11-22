@@ -6,7 +6,7 @@ The table maps full requirement ownership, not a claim that every counterexample
 |---|---|---|
 | INV-001..003 | VerificationExplorerTests / PackageIntegrationTests | Real local products compose without reverse dependencies; simultaneous Invar/Explorer/MCP clients share the same source daemon and verification coordinator |
 | INV-004..007 | VerificationDiscoveryTests / VerificationExplorerTests | Cross-page facts, incomplete coverage and cycles with/without explicit policy; pattern evidence cannot become native failure |
-| INV-008..010 | VerificationCoreTests / VerificationDiscoveryTests | Missing/unapproved/self-derived oracle, empty input, zero executed cases and unproved/false preconditions cannot certify the intended obligation |
+| INV-008..010 | VerificationCoreTests / VerificationDiscoveryTests | Missing or self-derived oracle, empty input, zero executed cases and unproved/false preconditions cannot certify the intended obligation |
 | INV-011..012 | VerificationPlannerTests / VerificationBackendTests | Missing capability and unsupported semantics block before execution; no name-derived FormalIR or hand-written semantic fallback |
 | INV-013..015 | VerificationRuntimeTests / VerificationExplorerTests | Edits/context/lock changes mid-capture, truncated preview, expired input lease, sandbox escape and unknown build reads cannot create an apparently immutable input |
 | INV-016..018 | VerificationBackendTests | Actual pinned finite TLC/Lean positive/negative/bound runs, translation UNVALIDATED and tampered artifacts/admitted/custom-axiom rejection; quantified mode additionally tests true/wrong/unproved properties with audited kernel output |

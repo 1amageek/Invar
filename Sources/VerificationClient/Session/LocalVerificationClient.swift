@@ -3,52 +3,28 @@ import Foundation
 import VerificationCore
 import VerificationFormal
 
-public actor LocalVerificationClient: WorkspaceClientSession, WorkspaceStatusReading, WorkspaceRequesting, ChangeTracking, VerificationPlanningClient, VerificationRunningClient, EvidenceQuerying, FormalEvidenceQuerying, WatchControlling {
+public actor LocalVerificationClient: WorkspaceStatusReading, WorkspaceRequesting, ChangeTracking, VerificationPlanningClient, VerificationRunningClient, EvidenceQuerying, FormalEvidenceQuerying, WatchControlling {
     public nonisolated let endpoint: LocalDaemonEndpoint
     private let maximumCalls: Int
-    private var grant: ClientSessionGrant?
-    private var refreshing: Task<AgentSession,any Error>?
     private var connections: [UUID:LocalConnection] = [:]
     private var inFlight = 0
     private var closed = false
     private var drainWaiters: [CheckedContinuation<Void,Never>] = []
     private init(endpoint: LocalDaemonEndpoint,maximumCalls: Int) { self.endpoint = endpoint; self.maximumCalls = maximumCalls }
-    public static func connect(endpoint: LocalDaemonEndpoint,label: String? = nil,capabilities: Set<WorkspaceCapability>,resumeCredential: String? = nil,maximumCalls: Int = 8) async throws -> LocalVerificationClient {
-        guard (1...32).contains(maximumCalls), !endpoint.workspaceID.isEmpty, endpoint.serverBinaryDigest.utf8.count == 64, !endpoint.serverCodeIdentity.isEmpty, endpoint.engineIdentity.utf8.count == 64 else { throw InvarError("INVALID_ARGUMENT","Invalid client endpoint/capacity",exitCode: 2) }
-        let client = LocalVerificationClient(endpoint: endpoint,maximumCalls: maximumCalls)
-        do { try await client.authenticate(label: label,capabilities: capabilities,resumeCredential: resumeCredential); return client }
-        catch { await client.shutdown(); throw typed(error) }
-    }
-    private func authenticate(label: String?,capabilities: Set<WorkspaceCapability>,resumeCredential: String?,expectedPrincipal: String? = nil) async throws {
-        guard label.map({ $0.utf8.count <= 128 }) ?? true else { throw InvarError("INVALID_ARGUMENT","Agent label exceeds budget",exitCode: 2) }
-        let desired = capabilities.map(\.rawValue).sorted()
-        let body: JSONValue = .object(["label":label.map(JSONValue.string) ?? .null,"capabilities":try JSONValue.encode(desired),"resumeCredential":resumeCredential.map(JSONValue.string) ?? .null])
-        let result = try await exchange("session.open",body: body,authenticated: false)
-        let value = try result.decode(ClientSessionGrant.self)
-        guard value.protocolVersion == 2, value.workspaceID == endpoint.workspaceID,
-            !value.epoch.isEmpty, value.engineIdentity == endpoint.engineIdentity,
-            value.session.expiresAt > Date().timeIntervalSince1970, Set(value.session.grants).isSubset(of: Set(desired)),
-            (32...256).contains(value.credential.utf8.count), (32...256).contains(value.resumeCredential.utf8.count) else { throw InvarError("PROTOCOL_MISMATCH","Daemon handshake changed workspace/protocol/grants") }
-        guard !closed, expectedPrincipal == nil || value.session.principal == expectedPrincipal else { throw InvarError("PROTOCOL_MISMATCH","Renewal changed principal or completed after client close",exitCode: 8) }
-        grant = value
-    }
-    public func refreshSession() async throws -> AgentSession {
-        if let refreshing { return try await refreshing.value }
-        let original = try sessionGrant()
-        let capabilities = Set(original.session.grants.compactMap(WorkspaceCapability.init(rawValue:)))
-        let task = Task {
-            try await self.authenticate(label: original.session.agentLabel,capabilities: capabilities,resumeCredential: original.resumeCredential,expectedPrincipal: original.session.principal)
-            return try self.sessionGrant().session
+    public static func connect(endpoint: LocalDaemonEndpoint,maximumCalls: Int = 8) async throws -> LocalVerificationClient {
+        guard (1...32).contains(maximumCalls), !endpoint.workspaceID.isEmpty, endpoint.serverBinaryDigest.utf8.count == 64,
+            !endpoint.serverCodeIdentity.isEmpty, endpoint.engineIdentity.utf8.count == 64 else {
+            throw InvarError("INVALID_ARGUMENT","Invalid client endpoint or call capacity",exitCode: 2)
         }
-        refreshing = task
-        defer { refreshing = nil }
-        return try await task.value
-    }
-    public func session() throws -> AgentSession { try sessionGrant().session }
-    public func resumeCredential() throws -> String { try sessionGrant().resumeCredential }
-    private func sessionGrant() throws -> ClientSessionGrant {
-        guard !closed, let grant else { throw InvarError("SESSION_CLOSED","Client session is closed") }
-        return grant
+        let client = LocalVerificationClient(endpoint: endpoint,maximumCalls: maximumCalls)
+        do {
+            let status = try await client.status()
+            guard status.protocolVersion == 3, status.workspaceID == endpoint.workspaceID,
+                status.engineIdentity == endpoint.engineIdentity else {
+                throw InvarError("PROTOCOL_MISMATCH","Daemon status differs from its local endpoint")
+            }
+            return client
+        } catch { await client.shutdown(); throw typed(error) }
     }
     public func prepare(_ operation: WorkspaceOperation,key: String,timeout: Double) async throws -> PreparedOperation {
         guard !key.isEmpty, key.utf8.count <= 128, !key.utf8.contains(0), timeout.isFinite, (1...3600).contains(timeout) else { throw InvarError("INVALID_ARGUMENT","Invalid idempotency key or initial deadline",exitCode: 2) }
@@ -56,21 +32,18 @@ public actor LocalVerificationClient: WorkspaceClientSession, WorkspaceStatusRea
         let body = try JSONValue.encode(preparation)
         let result = try await exchange("request.prepare",body: body)
         let envelope = try result.decode(RequestEnvelope.self)
-        let current = try sessionGrant(), fingerprint = try Canonical.identity(operation)
-        guard envelope.workspaceID == endpoint.workspaceID, envelope.principal == current.session.principal, envelope.daemonEpoch == current.epoch,
-            envelope.fingerprint == fingerprint, envelope.operation == operation.name, envelope.requestKey == key,
-            envelope.policyRevision == current.session.policyRevision, envelope.sessionID != nil, envelope.watchID == nil,
-            envelope.capabilities.contains(operation.requiredCapability),
-            Set(envelope.capabilities.map(\.rawValue)).isSubset(of: Set(current.session.grants)) else { throw InvarError("PROTOCOL_MISMATCH","Fixed request differs from prepared operation") }
+        let fingerprint = try Canonical.identity(operation)
+        guard envelope.workspaceID == endpoint.workspaceID, envelope.fingerprint == fingerprint,
+            envelope.operation == operation.name, envelope.requestKey == key, envelope.watchID == nil else {
+            throw InvarError("PROTOCOL_MISMATCH","Fixed request differs from prepared operation")
+        }
         return PreparedOperation(envelope: envelope,operation: operation)
     }
     public func accept(_ prepared: PreparedOperation) async throws -> OperationReceipt {
         do {
-            let current = try sessionGrant()
-            guard prepared.envelope.principal == current.session.principal, prepared.envelope.workspaceID == endpoint.workspaceID,
-                prepared.envelope.daemonEpoch == current.epoch, prepared.envelope.policyRevision == current.session.policyRevision,
-                prepared.envelope.sessionID != nil, prepared.envelope.watchID == nil, prepared.envelope.capabilities.contains(prepared.operation.requiredCapability),
-                Set(prepared.envelope.capabilities.map(\.rawValue)).isSubset(of: Set(current.session.grants)) else { throw InvarError("POLICY_DENIED","Prepared request exceeds the connected session scope",exitCode: 8) }
+            guard prepared.envelope.workspaceID == endpoint.workspaceID, prepared.envelope.watchID == nil else {
+                throw InvarError("REQUEST_MISMATCH","Prepared request belongs to another workspace or watch")
+            }
             let body = try JSONValue.encode(prepared)
             let result = try await exchange("request.accept",body: body)
             let receipt = try result.decode(OperationReceipt.self)
@@ -129,15 +102,8 @@ public actor LocalVerificationClient: WorkspaceClientSession, WorkspaceStatusRea
         let result = try await exchange("query",body: body,dataChannel: dataChannel)
         do { return try result.decode(Value.self) } catch { throw Self.typed(error) }
     }
-    private func exchange(_ method: String,body: JSONValue,authenticated: Bool = true,dataChannel: Bool = false) async throws -> JSONValue {
+    private func exchange(_ method: String,body: JSONValue,dataChannel: Bool = false) async throws -> JSONValue {
         guard !closed, inFlight < maximumCalls else { throw InvarError(closed ? "SESSION_CLOSED" : "RESOURCE_LIMIT","Client is closed or its call capacity is exhausted",exitCode: 6) }
-        let session: ClientSessionGrant?
-        if authenticated {
-            let original = try sessionGrant()
-            if original.session.expiresAt <= Date().timeIntervalSince1970 { _ = try await refreshSession() }
-            session = try sessionGrant()
-        } else { session = nil }
-        guard !closed, inFlight < maximumCalls else { throw InvarError("RESOURCE_LIMIT","Client closed or call capacity changed during renewal",exitCode: 6) }
         inFlight += 1; defer { finishCall() }
         let id = UUID(), connection: LocalConnection
         do { connection = try await LocalSocket.connect(path: dataChannel ? endpoint.dataSocketPath : endpoint.socketPath) }
@@ -146,8 +112,10 @@ public actor LocalVerificationClient: WorkspaceClientSession, WorkspaceStatusRea
         defer { connections.removeValue(forKey: id); await connection.close() }
         guard !closed else { throw InvarError("SESSION_CLOSED","Client closed while connecting") }
         let peer = try await connection.peerIdentity()
-        guard peer.binaryDigest == endpoint.serverBinaryDigest, peer.codeIdentity == endpoint.serverCodeIdentity else { throw InvarError("AUTHENTICATION_REQUIRED","Socket server executable differs from the configured daemon",exitCode: 8) }
-        let request: JSONValue = .object(["id":.string(id.uuidString),"protocolVersion":.number(2),"workspaceID":.string(endpoint.workspaceID),"method":.string(method),"epoch":session.map { .string($0.epoch) } ?? .null,"credential":session.map { .string($0.credential) } ?? .null,"body":body])
+        guard peer.binaryDigest == endpoint.serverBinaryDigest, peer.codeIdentity == endpoint.serverCodeIdentity else {
+            throw InvarError("EXECUTOR_MISMATCH","Socket server executable differs from the expected daemon",exitCode: 4)
+        }
+        let request: JSONValue = .object(["id":.string(id.uuidString),"protocolVersion":.number(3),"workspaceID":.string(endpoint.workspaceID),"method":.string(method),"body":body])
         let bytes = try CanonicalJSON.encode(request)
         guard bytes.count <= 65_536 else { throw InvarError("RESOURCE_LIMIT","Typed client request exceeds 64 KiB",exitCode: 6) }
         do {
@@ -175,10 +143,9 @@ public actor LocalVerificationClient: WorkspaceClientSession, WorkspaceStatusRea
         }
     }
     public func shutdown() async {
-        closed = true; grant = nil
+        closed = true
         let sockets = Array(connections.values)
         for socket in sockets { await socket.close() }
         if inFlight > 0 { await withCheckedContinuation { drainWaiters.append($0) } }
-        if let refreshing { _ = await refreshing.result }
     }
 }

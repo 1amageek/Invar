@@ -6,7 +6,7 @@ import VerificationCore
 import VerificationDaemon
 
 struct DaemonLauncher {
-    func start(configuration: DaemonConfiguration,engineIdentity: String,policyPath: String?) async throws -> DaemonStatus {
+    func start(configuration: DaemonConfiguration,engineIdentity: String) async throws -> DaemonStatus {
         let admin = LocalDaemonAdministration(paths: configuration.paths)
         defer { await admin.shutdown() }
         do {
@@ -21,7 +21,6 @@ struct DaemonLauncher {
         guard expectedBinary.count <= 128 * 1024 * 1024 else { throw InvarError("RESOURCE_LIMIT","Configured daemon binary exceeds peer identity profile") }
         var arguments = ["daemon","serve","--workspace",configuration.workspace.path,"--state",configuration.paths.stateDirectory.path]
         if !configuration.explicitStart { arguments += ["--automatic", "true"] }
-        if let path = policyPath { arguments += ["--policy",URL(fileURLWithPath: path).standardizedFileURL.path] }
         if let path = configuration.defaultConfigurationPath { arguments += ["--contracts",path] }
         let output = try bootstrapOutput()
         let pid = try spawn(configuration.executable,arguments: arguments,output: output.fileDescriptor)

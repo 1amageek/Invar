@@ -1,6 +1,6 @@
 import Foundation
 
-/// Host-reviewed whole-project workflow and its complete acceptance report.
+/// Captured whole-project workflow and its complete acceptance report.
 public struct ProjectCheck: Codable, Sendable, Equatable {
     public enum Stage: String, Codable, Sendable { case greenfieldSpecification }
     public let stage: Stage?
@@ -12,13 +12,12 @@ public struct ProjectCheck: Codable, Sendable, Equatable {
     public let report: String
     public let contracts: [String]
     public let budget: RunBudget
-    public let approved: Bool
     public let required: Bool
-    public init(id: String,subjectID: String,command: [String],toolDigests: [String:String],reportBuilder: String,report: String,contracts: [String],budget: RunBudget,approved: Bool,required: Bool = true,stage: Stage? = nil) {
+    public init(id: String,subjectID: String,command: [String],toolDigests: [String:String],reportBuilder: String,report: String,contracts: [String],budget: RunBudget,required: Bool = true,stage: Stage? = nil) {
         self.stage = stage
         self.id = id; self.subjectID = subjectID; self.command = command; self.toolDigests = toolDigests
         self.reportBuilder = reportBuilder; self.report = report; self.contracts = contracts; self.budget = budget
-        self.approved = approved; self.required = required
+        self.required = required
     }
     public func includes(_ path: String) -> Bool {
         guard let separator = report.lastIndex(of: "/") else { return false }

@@ -31,7 +31,7 @@ No concrete client/store/backend or Formal/Explorer dependency. New change/evide
 Immutable Sendable values cross boundaries. Component actors/explicit resource owners handle mutation, subscriptions, process/file/database lifetimes and awaited shutdown. No WASM/Embedded state branch is introduced; the host profile remains macOS 27 arm64.
 
 ## Failure, Concurrency, and Constraints
-Bound work with persisted policy and negotiated capabilities. Unknown/unsupported semantics, failed persistence and incomplete cleanup remain explicit. Do not install runtimes during verification.
+Bound work with configured resource limits and validated tool profiles. Unknown/unsupported semantics, failed persistence and incomplete cleanup remain explicit. Do not install runtimes during verification.
 
 ## Verification and Change Impact
 [Verification ownership](../../Documentation/VERIFICATION-PLAN.md) maps existing evidence and new ID/IC/IE/IV/IS acceptance. Recheck parent/direct consumers when a child contract changes. New products/ports are not advertised before their implementation and behavioral gates pass.

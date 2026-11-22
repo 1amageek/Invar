@@ -2,20 +2,11 @@ import Foundation
 import VerificationCore
 
 extension SQLiteVerificationStore {
-    public func saveAgentSession(_ session: AgentSession) throws {
-        try ensureAccepting()
-        try safeID(session.id)
-        guard session.expiresAt.isFinite, session.policyRevision > 0, !session.principal.isEmpty else { throw InvarError("INVALID_SESSION","Invalid authenticated session record") }
-        let bytes = try Canonical.encode(session)
-        try database.insert("session",id: session.id,bytes: bytes)
-        if try database.load("principalIdentity",id: session.principal) != nil { try database.link(ownerKind: "session",ownerID: session.id,targetKind: "principalIdentity",targetID: session.principal) }
-    }
     public func createChange(_ value: ChangeRecord) throws {
         try ensureAccepting()
         try safeID(value.id)
         guard !value.ownerPrincipal.isEmpty, value.state == "open", value.revision == 1, value.sealedRevisionID == nil, value.baseline.workspaceID == value.workspaceID else { throw InvarError("INVALID_CHANGE","New change requires an exact open baseline") }
         _ = try inventory(value.baseline)
-        if let session = value.sessionID { guard try database.load("session",id: session) != nil else { throw InvarError("INVALID_SESSION","Change lacks its recorded authenticated session") } }
         let rowID = Canonical.parts("invar.change-head/2",[value.id,"1"])
         let bytes = try Canonical.encode(value)
         try transaction {

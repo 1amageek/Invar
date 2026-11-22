@@ -16,7 +16,6 @@ import VerificationStore
         let ownership: DaemonOwnership
         let store: SQLiteVerificationStore
         let plan: VerificationPlan
-        let authentication: DaemonSessionAuthority
         let coordinator: WorkspaceCoordinator
         let control: DaemonRPCServer
         let data: DaemonRPCServer
@@ -28,26 +27,25 @@ import VerificationStore
                 task.cancel()
                 do { try await task.value } catch is CancellationError {}
             }
-            try await coordinator.shutdown(); await authentication.shutdown(); try await store.shutdown()
+            try await coordinator.shutdown(); try await store.shutdown()
             try await ownership.release()
             try FileManager.default.removeItem(at: ownership.paths.runtimeDirectory)
             try FileManager.default.removeItem(at: root)
         }
     }
     struct Operations: WorkspaceOperationExecuting {
-        func execute(_ demand: RunDemand,authority: OperationAuthority) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Protocol fixture owns prepublished verification plans only",exitCode: 3) }
+        func execute(_ demand: RunDemand) throws -> String { throw InvarError("UNSUPPORTED_OPERATION","Protocol fixture owns prepublished verification plans only",exitCode: 3) }
     }
-    func environment(capabilities: Set<WorkspaceCapability> = [.read,.verification,.sourceValues],sessionSeconds: Double = 60) async throws -> Environment {
+    func environment() async throws -> Environment {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("invar-protocol-" + UUID().uuidString)
         var initialized = false
-        var startupOwner: DaemonOwnership?, startupStore: SQLiteVerificationStore?, startupAuthentication: DaemonSessionAuthority?, startupCoordinator: WorkspaceCoordinator?
+        var startupOwner: DaemonOwnership?, startupStore: SQLiteVerificationStore?, startupCoordinator: WorkspaceCoordinator?
         var startupServers: [DaemonRPCServer] = [], startupTasks: [Task<Void,any Error>] = []
         defer {
             if !initialized {
                 for server in startupServers { do { try await server.shutdown() } catch { Issue.record(error) } }
                 for task in startupTasks { task.cancel(); do { try await task.value } catch is CancellationError {} catch { Issue.record(error) } }
                 if let startupCoordinator { do { try await startupCoordinator.shutdown() } catch { Issue.record(error) } }
-                if let startupAuthentication { await startupAuthentication.shutdown() }
                 if let startupStore { do { try await startupStore.shutdown() } catch { Issue.record(error) } }
                 if let startupOwner { do { try await startupOwner.release(); try FileManager.default.removeItem(at: startupOwner.paths.runtimeDirectory) } catch { Issue.record(error) } }
                 if FileManager.default.fileExists(atPath: root.path) { do { try FileManager.default.removeItem(at: root) } catch { Issue.record(error) } }
@@ -69,16 +67,14 @@ import VerificationStore
         let plan = VerificationPlan(id: try Canonical.identity(body),body: body)
         try await store.savePlan(plan)
         let peer = try ConnectionPeer.current(), epoch = UUID().uuidString
-        let policy = WorkspacePolicy(workspaceID: upstream.workspaceID,engineIdentity: engine,revision: 1,peers: [PeerGrant(binaryDigest: peer.binaryDigest,capabilities: capabilities)],approvals: [ContractApproval(configurationDigest: plan.body.configurationDigest,entries: [])],sessionSeconds: sessionSeconds,principalSeconds: 120,maximumSessions: 16,maximumConnections: 8,maximumEnvelopeSeconds: 60)
-        try await store.savePolicy(policy,expectedRevision: 0); try await store.activateEpoch(epoch,engineIdentity: engine)
+        try await store.activateEpoch(epoch,engineIdentity: engine)
         _ = try await store.observeInput(plan.body.input,epoch: epoch)
-        let authentication = DaemonSessionAuthority(repository: store,epoch: epoch); startupAuthentication = authentication
         let scheduler = VerificationScheduler(backend: StaticBackend(evaluator: ArchitectureRuleEvaluator()),repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: authentication,operations: Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: Operations(),epoch: epoch,maximumDemands: 8)
         startupCoordinator = coordinator
-        let state = DaemonState(workspaceID: upstream.workspaceID,epoch: epoch,engineIdentity: engine,policyRevision: 1)
+        let state = DaemonState(workspaceID: upstream.workspaceID,epoch: epoch,engineIdentity: engine)
         try await state.transition(to: .recovering); try await state.transition(to: .ready)
-        let handler = DaemonRequestDispatcher(workspaceID: upstream.workspaceID,epoch: epoch,retentionSeconds: 3600,repository: store,coordinator: coordinator,authentication: authentication,state: state)
+        let handler = DaemonRequestDispatcher(workspaceID: upstream.workspaceID,epoch: epoch,retentionSeconds: 3600,repository: store,coordinator: coordinator,state: state)
         let control = try DaemonRPCServer(socket: paths.controlSocket,channel: .control,maximumConnections: 4,handler: handler)
         startupServers.append(control)
         let data = try DaemonRPCServer(socket: paths.dataSocket,channel: .data,maximumConnections: 4,handler: handler)
@@ -86,7 +82,7 @@ import VerificationStore
         let tasks = [Task { try await control.serve() },Task { try await data.serve() }]; startupTasks = tasks
         let endpoint = LocalDaemonEndpoint(workspaceID: upstream.workspaceID,socketPath: paths.controlSocket.path,dataSocketPath: paths.dataSocket.path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: engine)
         initialized = true
-        return Environment(root: root,ownership: ownership,store: store,plan: plan,authentication: authentication,coordinator: coordinator,control: control,data: data,tasks: tasks,endpoint: endpoint)
+        return Environment(root: root,ownership: ownership,store: store,plan: plan,coordinator: coordinator,control: control,data: data,tasks: tasks,endpoint: endpoint)
     }
     func wait(_ receipt: OperationReceipt,client: LocalVerificationClient) async throws -> RunDemand {
         let deadline = ContinuousClock.now.advanced(by: .seconds(5))
@@ -97,13 +93,12 @@ import VerificationStore
             try await Task.sleep(for: .milliseconds(5))
         }
     }
-    @Test func realAuthenticationAndReceiptsLeadToOneSharedCommittedEvidenceView() async throws {
+    @Test func localClientsShareReceiptsAndCommittedEvidence() async throws {
         let environment = try await environment()
         defer { do { try await environment.shutdown() } catch { Issue.record(error) } }
-        let a = try await LocalVerificationClient.connect(endpoint: environment.endpoint,label: "agent-a",capabilities: [.read,.verification,.sourceValues])
-        let b = try await LocalVerificationClient.connect(endpoint: environment.endpoint,label: "agent-b",capabilities: [.read,.verification,.sourceValues])
+        let a = try await LocalVerificationClient.connect(endpoint: environment.endpoint)
+        let b = try await LocalVerificationClient.connect(endpoint: environment.endpoint)
         defer { await a.shutdown(); await b.shutdown() }
-        #expect(try await a.session().principal != b.session().principal)
         async let first = a.verify(planID: environment.plan.id,changeRevisionID: nil,replayOfRunID: nil,key: "a",timeout: 30)
         async let second = b.verify(planID: environment.plan.id,changeRevisionID: nil,replayOfRunID: nil,key: "b",timeout: 30)
         let receipts = try await [first,second]
@@ -122,20 +117,19 @@ import VerificationStore
         let viewA = try await a.view(referenceA.id), viewB = try await b.view(referenceB.id)
         #expect(viewA.evidenceIDs == viewB.evidenceIDs)
         #expect(try viewA.reference() == referenceA)
-        await #expect(throws: InvarError.self) { try await b.receipt(envelopeID: receipts[0].id) }
+        #expect(try await b.receipt(envelopeID: receipts[0].id) == receipts[0])
         #expect(try await a.status().state == "ready")
     }
     @Test func ordinaryReadGetsCommittedAxesWithoutPrivateScopeLogsOrValues() async throws {
         let environment = try await environment()
         defer { do { try await environment.shutdown() } catch { Issue.record(error) } }
-        let client = try await LocalVerificationClient.connect(endpoint: environment.endpoint,label: "administrator",capabilities: [.read,.verification,.nativeExecution])
+        let client = try await LocalVerificationClient.connect(endpoint: environment.endpoint)
         defer { await client.shutdown() }
-        #expect(try await client.session().grants == ["read","verification"])
         let receipt = try await client.verify(planID: environment.plan.id,changeRevisionID: nil,replayOfRunID: nil,key: "readable",timeout: 30)
         let operation = try await wait(receipt,client: client), id = try #require(operation.resultID)
         let summary = try await client.run(id)
         #expect(summary.acceptedAtCompletion)
-        await #expect(throws: InvarError.self) { try await client.runRecord(id) }
+        #expect(try await client.runRecord(id).id == id)
         let source = try #require(try await client.sourceHead())
         #expect(source.confirmed && source.input.workspaceID == environment.endpoint.workspaceID)
         _ = try await environment.store.invalidateSource(workspaceID: source.workspaceID,epoch: source.daemonEpoch,reason: "Source observation became uncertain")
@@ -149,20 +143,20 @@ import VerificationStore
         #expect(String(decoding: bytes,as: UTF8.self).contains(secret) == false)
         #expect(projected.evidenceID == evidence.id && projected.outcome == evidence.outcome)
         #expect(projected.resources == ["wallSeconds":0.1])
-        await #expect(throws: InvarError.self) { try await client.evidence(evidence.id) }
-        let readonly = try await LocalVerificationClient.connect(endpoint: environment.endpoint,capabilities: [.read])
+        #expect(try await client.evidence(evidence.id) == evidence)
+        let readonly = try await LocalVerificationClient.connect(endpoint: environment.endpoint)
         defer { await readonly.shutdown() }
         let request = WorkspaceOperation.verify(planID: environment.plan.id,changeRevisionID: nil,replayOfRunID: nil)
-        await #expect(throws: InvarError.self) { try await readonly.prepare(request,key: "forbidden",timeout: 20) }
+        #expect(try await readonly.prepare(request,key: "follow-up",timeout: 20).operation == request)
     }
 }
 
 extension DaemonProtocolTests {
-    func raw(_ environment: Environment,method: String,body: JSONValue,credential: String? = nil,epoch: String? = nil) async throws -> JSONValue {
+    func raw(_ environment: Environment,method: String,body: JSONValue) async throws -> JSONValue {
         let connection = try await LocalSocket.connect(path: environment.endpoint.socketPath)
         defer { await connection.close() }
         let id = UUID().uuidString
-        let request: JSONValue = .object(["id":.string(id),"protocolVersion":.number(2),"workspaceID":.string(environment.endpoint.workspaceID),"method":.string(method),"epoch":epoch.map(JSONValue.string) ?? .null,"credential":credential.map(JSONValue.string) ?? .null,"body":body])
+        let request: JSONValue = .object(["id":.string(id),"protocolVersion":.number(3),"workspaceID":.string(environment.endpoint.workspaceID),"method":.string(method),"body":body])
         try await connection.write(request,timeout: .seconds(5))
         let response = try #require(try await connection.read(timeout: .seconds(5)))
         #expect(response["id"].string == id)
@@ -171,24 +165,22 @@ extension DaemonProtocolTests {
     @Test func actualDispatcherRejectsPayloadAuthorityFlagsAndBulkQueriesOnControl() async throws {
         let environment = try await environment()
         defer { do { try await environment.shutdown() } catch { Issue.record(error) } }
-        let opened = try await raw(environment,method: "session.open",body: .object(["label":.string("host user"),"capabilities":.array([.string("read"),.string("verification")]),"resumeCredential":.null]))
-        let grant = try opened["result"].decode(ClientSessionGrant.self)
         let preparation = OperationPreparation(operation: .verify(planID: environment.plan.id,changeRevisionID: nil,replayOfRunID: nil),key: "injected",timeout: 20)
         let encoded = try JSONValue.encode(preparation)
         guard case .object(var fields) = encoded else { throw InvarError("INVALID_FIXTURE","Preparation is not an object") }
         fields["nativeExecutionAllowed"] = .bool(true)
-        let rejected = try await raw(environment,method: "request.prepare",body: .object(fields),credential: grant.credential,epoch: grant.epoch)
+        let rejected = try await raw(environment,method: "request.prepare",body: .object(fields))
         #expect(rejected["error"]["code"].string == "INVALID_REQUEST")
         #expect(try await environment.store.pendingDemands().isEmpty)
         let query = try JSONValue.encode(WorkspaceQuery.plan(id: environment.plan.id))
-        let wrongChannel = try await raw(environment,method: "query",body: query,credential: grant.credential,epoch: grant.epoch)
+        let wrongChannel = try await raw(environment,method: "query",body: query)
         #expect(wrongChannel["error"]["code"].string == "INVALID_REQUEST")
     }
-    @Test func watchQueriesUseCommittedHeadsAndOriginalPrincipalOverActualAuthenticatedSockets() async throws {
-        let environment = try await environment(capabilities: [.read,.verification,.planning,.watching])
+    @Test func workspaceClientsObserveCommittedWatches() async throws {
+        let environment = try await environment()
         defer { do { try await environment.shutdown() } catch { Issue.record(error) } }
-        let owner = try await LocalVerificationClient.connect(endpoint: environment.endpoint,capabilities: [.read,.verification,.planning,.watching])
-        let other = try await LocalVerificationClient.connect(endpoint: environment.endpoint,capabilities: [.read])
+        let owner = try await LocalVerificationClient.connect(endpoint: environment.endpoint)
+        let other = try await LocalVerificationClient.connect(endpoint: environment.endpoint)
         defer { await owner.shutdown(); await other.shutdown() }
         let prepared = try await owner.prepare(.watch(configurationPath: "contracts.json",budget: RunBudget()),key: "watch-record",timeout: 15)
         // This transport test supplies a committed registration without claiming a source-monitor implementation.
@@ -197,17 +189,15 @@ extension DaemonProtocolTests {
         _ = try await environment.store.acceptDemand(envelope,demand: queued,now: Date().timeIntervalSince1970)
         let running = queued.transitioning(to: "running")
         try await environment.store.transitionDemand(running,expectedRevision: queued.revision)
-        let principal = try #require(try await environment.store.principal(identity: envelope.principal))
-        let record = WatchRecord(id: queued.id,envelopeID: envelope.id,workspaceID: envelope.workspaceID,principal: envelope.principal,policyRevision: envelope.policyRevision,capabilities: envelope.capabilities,configurationPath: "contracts.json",budget: RunBudget(),expiresAt: principal.expiresAt)
+        let record = WatchRecord(id: queued.id,envelopeID: envelope.id,workspaceID: envelope.workspaceID,principal: envelope.principal,configurationPath: "contracts.json",budget: RunBudget(),expiresAt: Date.distantFuture.timeIntervalSince1970)
         try await environment.store.createWatch(record)
         try await environment.store.completeDemand(running.transitioning(to: "completed",resultID: record.id),run: nil,view: nil,expectedRevision: running.revision)
         let retained = try await environment.store.loadWatch(record.id)
         #expect(try await owner.watch(record.id) == retained)
         #expect(try await owner.watches() == [retained])
         #expect(try await owner.status().watchCount == 1)
-        #expect(try await other.watches().isEmpty)
-        await #expect(throws: InvarError.self) { try await other.watch(record.id) }
-        await #expect(throws: InvarError.self) { try await other.stopWatch(record.id,key: "forbidden-stop",timeout: 10) }
+        #expect(try await other.watches() == [retained])
+        #expect(try await other.watch(record.id) == retained)
         let stopped = retained.revising(state: "stopped")
         try await environment.store.saveWatch(stopped,expectedRevision: retained.revision)
         #expect(try await owner.watches().isEmpty)

@@ -23,7 +23,7 @@ The [verify-project skill](plugins/invar/skills/verify-project/SKILL.md) gives C
 | --- | --- |
 | Developer | Review requirements and evidence, make decisions about the intended behavior, and initiate or inspect verification. |
 | Agent | Follow the skill, prepare reviewable inputs in the target project, and use Invar over CLI or MCP to execute and observe the workflow. |
-| Invar | Admit authorized work, run checkers on fixed inputs, retain original evidence, evaluate gates and publish results for the exact workspace and subject. |
+| Invar | Accept workspace verification requests, run checkers on fixed inputs, retain original evidence, evaluate gates and publish results for the exact workspace and subject. |
 | Architecture Explorer | Own source indexing and navigation from architecture to implementation. Preserve dependency direction and evidence across views of the same snapshot. Give the user a direct path from the Workspace to the specification, verification controls and results. Render the same requirements, stage status, evidence and limits that the Agent can query. |
 
 Source-derived dependency candidates support architecture review. Formal guarantees depend on the checked properties, execution evidence and validated source correspondence within their recorded scope. The [workflow skill](plugins/invar/skills/verify-project/SKILL.md#execute-the-reviewed-gates) defines the integration review and its pass conditions.

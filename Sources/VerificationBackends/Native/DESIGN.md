@@ -4,7 +4,7 @@
 Build exact captured standalone Swift modules and run explicit native JSON-oracle harnesses, including one bounded seeded signed-integer fuzz profile. Parent: [Backends](../DESIGN.md). No children.
 
 ## Responsibilities and Boundaries
-Own the macOS sandbox/compiler adapter, native result classification and deterministic fuzz/replay/minimization. The host provides approved module sources, independent harness oracle, tool paths and budgets. No SwiftPM scripts/plugins, dependency download, inferred oracle or arbitrary shell is used.
+Own the macOS sandbox/compiler adapter, native result classification and deterministic fuzz/replay/minimization. The host provides captured module sources, independent harness oracle, tool paths and budgets. No SwiftPM scripts/plugins, dependency download, inferred oracle or arbitrary shell is used.
 
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |

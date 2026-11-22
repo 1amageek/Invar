@@ -8,9 +8,8 @@ public struct NativeBackend: VerificationBackend {
     private let runner: any NativeSessionExecuting
     public init(builder: any NativeBuildPreparing, runner: any NativeSessionExecuting) { self.builder = builder; self.runner = runner }
     public func execute(_ context: BackendContext) async throws -> VerificationEvidence {
-        guard context.nativeExecutionAllowed else { throw InvarError("POLICY_DENIED", "Host did not grant native execution", exitCode: 8) }
         let started = Canonical.date()
-        guard context.job.approved, let profile = context.job.native?.profile ?? context.job.fuzz?.profile else { throw InvarError("POLICY_DENIED", "Native execution lacks its approved profile", exitCode: 8) }
+        guard let profile = context.job.native?.profile ?? context.job.fuzz?.profile else { throw InvarError("POLICY_DENIED", "Native execution lacks its profile", exitCode: 8) }
         let artifact = try await builder.prepare(context)
         try await runner.charge(artifact.resources)
         let work = context.outputRoot.appendingPathComponent("native")

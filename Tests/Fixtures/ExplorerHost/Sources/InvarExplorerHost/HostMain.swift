@@ -41,24 +41,15 @@ import FormalEvidence
                 let value = try await ArchitectureClient(workspace: paths.root.path).call(arguments[2],parameters: parameters)
                 try output(value); return
             }
-            guard ["request","query","formal"].contains(command), arguments.count == 6 else { throw InvarError("INVALID_ARGUMENT","Expected client state/credential/key/payload") }
-            let state = URL(fileURLWithPath: arguments[2]), credentialPath = URL(fileURLWithPath: arguments[3])
+            guard ["request","query","formal"].contains(command), arguments.count == 5 else { throw InvarError("INVALID_ARGUMENT","Expected client state/key/payload") }
+            let state = URL(fileURLWithPath: arguments[2])
             let endpointPaths = DaemonEndpointPaths(workspaceID: paths.workspaceID,userID: getuid(),homeDirectory: FileManager.default.homeDirectoryForCurrentUser,stateDirectory: state)
             let admin = LocalDaemonAdministration(paths: endpointPaths)
             let endpoint = try await admin.endpoint(); await admin.shutdown()
-            let resume: String?
-            if FileManager.default.fileExists(atPath: credentialPath.path) {
-                let values = try credentialPath.resourceValues(forKeys: [.isRegularFileKey,.fileSizeKey,.isSymbolicLinkKey])
-                guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? Int.max) <= 256 else { throw InvarError("INVALID_ARGUMENT","Unsafe fixture principal credential") }
-                resume = try String(contentsOf: credentialPath,encoding: .utf8)
-            } else { resume = nil }
-            let client = try await LocalVerificationClient.connect(endpoint: endpoint,label: "integration-host",capabilities: [.read,.sourceValues,.changes,.planning,.verification,.watching,.nativeExecution],resumeCredential: resume)
+            let client = try await LocalVerificationClient.connect(endpoint: endpoint)
             defer { await client.shutdown() }
-            let secret = try await client.resumeCredential()
-            try Data(secret.utf8).write(to: credentialPath,options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600],ofItemAtPath: credentialPath.path)
-            guard arguments[5].utf8.count <= 65536 else { throw InvarError("RESOURCE_LIMIT","Fixture payload exceeds typed limit") }
-            let bytes = Data(arguments[5].utf8)
+            guard arguments[4].utf8.count <= 65536 else { throw InvarError("RESOURCE_LIMIT","Fixture payload exceeds typed limit") }
+            let bytes = Data(arguments[4].utf8)
             if command == "formal" {
                 let request = try JSONDecoder().decode(JSONValue.self,from: bytes)
                 guard let evidenceID = request["evidenceID"].string else { throw InvarError("INVALID_ARGUMENT","Expected evidence ID") }
@@ -80,7 +71,7 @@ import FormalEvidence
                 case .verify(let id,_,_,_): timeout = try await client.plan(id).budget.runTimeoutSeconds
                 default: timeout = 60
                 }
-                let fixed = try await client.prepare(operation,key: arguments[4],timeout: timeout)
+                let fixed = try await client.prepare(operation,key: arguments[3],timeout: timeout)
                 let receipt = try await client.accept(fixed)
                 try output(JSONValue.encode(receipt))
             } else {

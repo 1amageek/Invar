@@ -1,7 +1,7 @@
 # VerificationClient.Formal
 
 ## Purpose and Scope
-Own remote FormalEvidenceOpening/Reading implementations over the existing authenticated daemon session. Parent: [Client](../DESIGN.md). No children.
+Own remote FormalEvidenceOpening/Reading implementations over the existing local daemon connection. Parent: [Client](../DESIGN.md). No children.
 
 ## Responsibilities and Boundaries
 Send typed query requests and preserve original FormalEvidence results. No local bundle files, SQLite, parsing, extraction or proof computation.
@@ -9,7 +9,7 @@ Send typed query requests and preserve original FormalEvidence results. No local
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |
 |---|---|---|---|---|
-| [Client](../DESIGN.md) | parent | Authenticated session | Shared transport owner | Connection close does not stop verification |
+| [Client](../DESIGN.md) | parent | Local daemon IPC | Shared transport owner | Connection close does not stop verification |
 | [Formal queries](../../VerificationFormal/Queries/DESIGN.md) | depends on | Typed requests/leases | Data-only SDK bridge | No copied formal models |
 
 ## Architecture

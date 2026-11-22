@@ -108,7 +108,7 @@ import VerificationStore
         let manifest = ExtensionManifest(extensionID: "invar",displayName: "Invar",requestedPermissions: [.graphRead,.graphsWrite,.runsWrite])
         let publisher = ExplorerPublisher(repository: store,manifest: manifest,resources: resources) { transport }
         let scheduler = VerificationScheduler(backend: StaticBackend(evaluator: ArchitectureRuleEvaluator()),repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"),resources: resources)
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: DurableCoordinatorTests.Authorization(),operations: DurableCoordinatorTests.Operations(),epoch: epoch,maximumDemands: 8,publisher: publisher)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: epoch,maximumDemands: 8,publisher: publisher)
         return Fixture(root: root,store: store,plan: plan,coordinator: coordinator,publisher: publisher,resources: resources,transport: transport,epoch: epoch)
     }
     func execute(_ value: Fixture,key: String) async throws -> RunDemand {
@@ -150,7 +150,7 @@ import VerificationStore
     @Test func sameInputReverseCompletionSelectsOnlyTheNewerPublishedGeneration() async throws {
         let value = try await fixture(), delayed = DelayedPublication(value.publisher)
         let scheduler = VerificationScheduler(backend: StaticBackend(evaluator: ArchitectureRuleEvaluator()),repository: value.store,applicability: SchedulerTests.Current(value: "matchesInputs"),resources: value.resources)
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: DurableCoordinatorTests.Authorization(),operations: DurableCoordinatorTests.Operations(),epoch: value.epoch,maximumDemands: 8,publisher: delayed)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: value.epoch,maximumDemands: 8,publisher: delayed)
         defer { do { try await coordinator.shutdown(); try await cleanup(value) } catch { Issue.record(error) } }
         let (firstEnvelope,operation) = try await DurableCoordinatorTests().request(store: value.store,plan: value.plan,epoch: value.epoch,key: "first-delayed")
         let firstReceipt = try await coordinator.submit(firstEnvelope,operation: operation)
@@ -213,7 +213,7 @@ import VerificationStore
         let complete = try await execute(value,key: "complete")
         try await value.publisher.flush()
         let scheduler = VerificationScheduler(backend: SchedulerTests.ResourceFailure(),repository: value.store,resources: value.resources)
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: DurableCoordinatorTests.Authorization(),operations: DurableCoordinatorTests.Operations(),epoch: value.epoch,maximumDemands: 8,publisher: value.publisher)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: value.epoch,maximumDemands: 8,publisher: value.publisher)
         defer { do { try await coordinator.shutdown() } catch { Issue.record(error) } }
         let operation = WorkspaceOperation.verify(planID: value.plan.id,changeRevisionID: nil,replayOfRunID: complete.resultID)
         let envelope = try await ReassociationTests().envelope(operation,store: value.store,workspace: value.plan.body.input.workspaceID,epoch: value.epoch)

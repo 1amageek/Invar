@@ -1,6 +1,6 @@
 public enum RunAssessment {
     public static func accepts(_ evidence: VerificationEvidence, for job: any VerificationObligation, association: EvidenceAssociation) -> Bool {
-        guard evidence.jobID == job.id, job.approved, evidence.execution == "completed", (job.backend != "fuzz" && evidence.outcome == "holdsWithinScope" || job.backend == "fuzz" && evidence.outcome == "noViolationObservedWithinBudget" && job.acceptsFuzzBudget), association.evidenceID == evidence.id, association.applicability == "matchesInputs", evidence.adequacy == "completeWithinScope" else { return false }
+        guard evidence.jobID == job.id, evidence.execution == "completed", (job.backend != "fuzz" && evidence.outcome == "holdsWithinScope" || job.backend == "fuzz" && evidence.outcome == "noViolationObservedWithinBudget" && job.acceptsFuzzBudget), association.evidenceID == evidence.id, association.applicability == "matchesInputs", evidence.adequacy == "completeWithinScope" else { return false }
         if job.backend == "project" { return evidence.domain == "projectContract" && evidence.translation == "notApplicable" }
         if job.backend == "formal" && evidence.domain == "generatedModel" { return job.acceptsUnvalidatedModel && evidence.translation == "unvalidated" }
         if ["native", "fuzz"].contains(job.backend) { return evidence.domain == "nativeExecution" && evidence.translation == "notApplicable" }

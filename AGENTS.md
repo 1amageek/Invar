@@ -10,12 +10,12 @@ Apply the global development rules to changes in this repository. Read [PHILOSOP
 
 ## Execution and evidence
 
-- Use Invar's authenticated CLI or MCP path for workflow verification. Invar owns admission, the captured inputs, checker execution, receipts, verdict derivation and publication. Direct tool runs may inform debugging. A workflow gate requires the actual Invar execution record and a review bound to its inputs.
+- Use Invar's CLI or MCP path for workflow verification. Invar owns admission, the captured inputs, checker execution, receipts, verdict derivation and publication. Direct tool runs may inform debugging. A workflow gate requires the actual Invar execution record and a review bound to its inputs.
 - Keep requirements-derived models separate from implementation-generated models. Record test evidence, formal claims, source correspondence and publication status at their actual scope. Keep missing evidence, unsupported inputs and undecided correspondence explicit. Use a passed project verdict only when all required checks and reviews pass.
 - Preserve the same workspace, subject and exact input binding across Explorer and Agent interactions. Expose specification and project verification from the Workspace, including before source code or a C4 Map exists. Treat reopening evidence as a read operation and show the verification destination before waiting for its data.
 
 ## Review behavioral changes
 
 - For changes to workflow entry, execution, publication or evidence navigation, verify the affected behavior in the actual CLI/MCP and Explorer paths using the same workspace and snapshot. For changes across the whole workflow, reproduce a project with no `SPEC.md` or production source, review and verify the written specification before adding code, then exercise the post-implementation gates and confirm that Explorer shows the outcome. Include an incomplete or failed path with the correct return stage.
-- When validating a plugin update, check the installed skill and exercise its configured MCP executable in the intended workspace. Record installation, authorized connection and verification execution as separate observations.
+- When validating a plugin update, check the installed skill and exercise its configured MCP executable in the intended workspace. Record installation, workspace connection and verification execution as separate observations.
 - Report missing behavior explicitly during review. Documentation and skill text define the required behavior. CLI runs, MCP receipts and the Explorer view establish what works in the current build.

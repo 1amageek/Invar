@@ -18,14 +18,14 @@ The execution authorities of existing tools remain their owners. The report buil
 | ID | Requirement |
 |---|---|
 | PA01 | A Map system/container starts the registered verify-project action, bound to one subject, workspace, snapshot and original manifest. The selected declaration directory owns Verification/Project/invar.json. Its project.subjectID must match the subject. |
-| PA02 | Invar executes only a host-approved project command configuration and exact contract bytes under planning, verification, nativeExecution and userLeanExecution grants. Explorer confirmation never grants missing host authority. |
+| PA02 | A deliberate verification request runs against the configuration and inputs captured for its workspace snapshot. CLI, MCP and Explorer use the same execution rules. Edits can produce a new run without approval records or per-client permissions. |
 | PA03 | The plan reads the complete captured input except its previous report and retained run output directory. A private writable copy owns execution; live repository sources are never used as execution inputs. Tool file identities are checked before and after. |
 | PA04 | The project workflow runs Specification Verification and Implementation Model Verification, emits an immutable receipt manifest, and uses the plugin report builder to validate the complete acceptance inventory, receipt hashes, domains and evidence for Source-to-Model Validation. Missing or unsupported evidence remains incomplete. |
 | PA05 | A valid completed report with verdict passed/failed/incomplete corresponds to process exit 0/5/6. A nonmatching exit, absent report, changed receipt/input or empty inventory cannot produce a checked result. Process deadlines, cancellation and restart preserve non-success. |
 | PA06 | The existing durable Action ledger, scheduler, process journal and publication outbox own at-most-once admission, execution, cancellation and original-snapshot publication. A retry of reading or returning to a view never starts work. |
 | PA07 | The whole report is published as a graph contribution and an outcome annotation bound to the original subject. The report keeps all three assessments and the complete inventory. Explorer displays the outcome and can reopen the original evidence. |
 
-The project-command profile explicitly executes reviewed project code with host authority. It is distinct from the standalone native harness sandbox; no sandbox or validated source semantics is implied by its process isolation. Requirements models and verification inputs remain repository-owned. Runtime copies, logs and exact report artifacts are retained by Invar.
+The verification daemon serves the local OS user through private Unix sockets. Repository-defined commands run in an OS-confined worker over a private snapshot copy, with network access denied and writes restricted to the attempt. Checks bind their tools and inputs to evidence. Requirements models and verification inputs remain repository-owned.
 
 ## Project workflow gates
 

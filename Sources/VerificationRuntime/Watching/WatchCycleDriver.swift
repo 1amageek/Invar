@@ -37,7 +37,6 @@ actor WatchCycleDriver {
     }
     private func drive(_ id: String,force: Bool) async throws {
         try Task.checkCancellation()
-        try await repository.authorizeWatch(id)
         var watch = try await repository.loadWatch(id)
         if watch.cycle.phase == "idle" {
             if !force, let plan = watch.lastPlanID {
@@ -110,7 +109,6 @@ actor WatchCycleDriver {
         try Task.checkCancellation()
         let value = try await repository.loadWatch(id)
         guard value.state == "active", value.cycle.generation == generation else { throw InvarError("WATCH_STOPPED","Watch admission or generation changed",exitCode: 6) }
-        try await repository.authorizeWatch(id)
         return value
     }
     private static func failure(_ error: any Error) -> InvarError {

@@ -16,14 +16,14 @@ public enum ConfigurationReader {
                 var item = entries[index]
                 let allowed: Set<String>
                 switch name {
-                case "architecture": allowed = ["id", "kind", "relations", "from", "to", "approved", "required"]
-                case "formal": allowed = ["id", "source", "mode", "specification", "toolchain", "approved", "required", "acceptUnvalidatedModel", "memoryMiB"]
-                case "native": allowed = ["id", "profile", "expectedTestCount", "expectedSignal", "approved", "required"]
-                default: allowed = ["id", "profile", "corpus", "inputEncoding", "seed", "minimum", "maximum", "iterations", "approved", "required", "acceptNoViolationObservedWithinBudget"]
+                case "architecture": allowed = ["id", "kind", "relations", "from", "to", "required"]
+                case "formal": allowed = ["id", "source", "mode", "specification", "toolchain", "required", "acceptUnvalidatedModel", "memoryMiB"]
+                case "native": allowed = ["id", "profile", "expectedTestCount", "expectedSignal", "required"]
+                default: allowed = ["id", "profile", "corpus", "inputEncoding", "seed", "minimum", "maximum", "iterations", "required", "acceptNoViolationObservedWithinBudget"]
                 }
                 guard Set(item.keys).isSubset(of: allowed), let id = item["id"] as? String, !id.isEmpty, id.utf8.count <= 128,
                     id.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 95 || $0 == 45 }) else { throw invalid("Unknown fields or unsafe check identifier") }
-                item["approved"] = item["approved"] ?? false; item["required"] = item["required"] ?? true
+                item["required"] = item["required"] ?? true
                 if name == "architecture" {
                     item["relations"] = item["relations"] ?? ["dependsOn", "imports", "calls"]
                     for key in ["from", "to"] where item[key] != nil {
@@ -52,7 +52,7 @@ public enum ConfigurationReader {
             root[name] = entries
         }
         if let project = root["project"] {
-            let required: Set<String> = ["id","subjectID","command","toolDigests","reportBuilder","report","contracts","budget","approved","required"]
+            let required: Set<String> = ["id","subjectID","command","toolDigests","reportBuilder","report","contracts","budget","required"]
             guard let fields = project as? [String:Any], required.isSubset(of: fields.keys),
                   Set(fields.keys).subtracting(required).isSubset(of: ["stage"]) else { throw invalid("Invalid project-command fields") }
         }

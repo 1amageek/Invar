@@ -10,7 +10,7 @@ public actor VerificationScheduler: VerificationScheduling {
         self.repository = repository; self.applicability = applicability
         executor = SharedJobExecutor(backend: backend,repository: repository,policy: policy,resources: resources)
     }
-    public func run(_ planID: String,nativeExecutionAllowed: Bool = false,replay: Bool = false,persist: Bool = true,demandID: String? = nil) async throws -> VerificationRun {
+    public func run(_ planID: String,replay: Bool = false,persist: Bool = true,demandID: String? = nil) async throws -> VerificationRun {
         guard !stopped else { throw InvarError("COORDINATOR_STOPPED","Scheduler is stopped") }
         let plan = try await repository.schedulingPlan(planID)
         var pending = plan.jobs, evidence: [VerificationEvidence] = [], running = 0, memory = 0
@@ -26,11 +26,8 @@ public actor VerificationScheduler: VerificationScheduling {
                     admitted = false
                     for index in pending.indices {
                         let job = pending[index]
-                        if ["native","fuzz","project"].contains(job.backend) && !nativeExecutionAllowed {
-                            evidence.append(ExecutionFailure.evidence(job,inputID: plan.input.id,execution: "blocked",detail: "Host did not grant native execution",code: "POLICY_DENIED")); pending.remove(at: index); admitted = true; break
-                        }
-                        if !job.approved || job.memoryMiB > plan.budget.memoryMiB {
-                            evidence.append(ExecutionFailure.evidence(job,inputID: plan.input.id,execution: "blocked",detail: !job.approved ? "Obligation is not approved" : "Job cannot fit its memory admission budget")); pending.remove(at: index); admitted = true; break
+                        if job.memoryMiB > plan.budget.memoryMiB {
+                            evidence.append(ExecutionFailure.evidence(job,inputID: plan.input.id,execution: "blocked",detail: "Job cannot fit its memory admission budget")); pending.remove(at: index); admitted = true; break
                         }
                         let completed = Set(evidence.filter { value in
                             guard let predecessor = plan.jobs.first(where: { $0.id == value.jobID }) else { return false }
@@ -45,7 +42,7 @@ public actor VerificationScheduler: VerificationScheduling {
                             group.addTask {
                                 do {
                                     let value = try await BoundedOperation.run(seconds: seconds) {
-                                        try await executor.execute(reference: job,input: plan.input,budget: plan.budget,demandID: demandID,nativeExecutionAllowed: nativeExecutionAllowed,replay: replay,priority: replay ? 0 : 1)
+                                        try await executor.execute(reference: job,input: plan.input,budget: plan.budget,demandID: demandID,replay: replay,priority: replay ? 0 : 1)
                                     }
                                     return (job,value)
                                 } catch { return (job,ExecutionFailure.evidence(job,inputID: plan.input.id,error: error)) }

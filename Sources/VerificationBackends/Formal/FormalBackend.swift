@@ -29,7 +29,7 @@ public struct FormalBackend: VerificationBackend {
     }
     public func execute(_ context: BackendContext) async throws -> VerificationEvidence {
         let started = Canonical.date()
-        guard let check = context.job.formal, check.approved, let preparation = context.job.compilation, let artifact = context.compilationRoot else { throw InvarError("UNAPPROVED_OBLIGATION","Formal obligation lacks its approved prepared compilation",exitCode: 8) }
+        guard let check = context.job.formal, let preparation = context.job.compilation, let artifact = context.compilationRoot else { throw InvarError("INVALID_PLAN","Formal obligation lacks its prepared compilation",exitCode: 8) }
         let specification = try FixedInputReader.oracle(context)
         guard let file = context.job.inputs.first(where: { $0.path == check.source }) else { throw InvarError("INPUT_UNAVAILABLE","Formal source is not captured") }
         guard ["swift","rust"].contains(preparation.language), preparation.sourceDigest == file.digest, preparation.executorIdentity == context.executorIdentity else { throw InvarError("INPUT_MISMATCH","Prepared compilation differs from fixed source binding") }

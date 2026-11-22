@@ -55,13 +55,11 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
     workspace = root / "workspace"
     workspace.mkdir()
     (workspace / "Demo.swift").write_text("public func compute(_ value: Int64) -> Int64 { return value + 1 }\n")
-    contracts = {"schemaVersion": 1, "architecture": [{"id": "cycle", "kind": "cycle", "approved": True}]}
-    entries = []
+    contracts = {"schemaVersion": 1, "architecture": [{"id": "cycle", "kind": "cycle"}]}
     if args.toolchain:
         oracle = json.dumps({"schemaVersion": 1, "fuel": 64, "cases": [{"name": "positive", "entry": "compute", "arguments": ["2"], "expected": {"status": "returned", "value": "4"}}]}, separators=(",", ":")).encode()
         (workspace / "oracle.json").write_bytes(oracle)
-        entries = [{"path": "oracle.json", "digest": hashlib.sha256(oracle).hexdigest(), "byteCount": len(oracle)}]
-        contracts["formal"] = [{"id": "model", "source": "Demo.swift", "mode": "finite", "specification": "oracle.json", "toolchain": str(Path(args.toolchain).resolve()), "approved": True, "required": True, "acceptUnvalidatedModel": True, "memoryMiB": 4096}]
+        contracts["formal"] = [{"id": "model", "source": "Demo.swift", "mode": "finite", "specification": "oracle.json", "toolchain": str(Path(args.toolchain).resolve()), "required": True, "acceptUnvalidatedModel": True, "memoryMiB": 4096}]
     listener = None
     if args.native:
         assert not (args.toolchain or args.watch or args.actions or args.frontends), "Native acceptance owns an independent bounded run"
@@ -71,21 +69,19 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
         listener.bind(("127.0.0.1", 0))
         listener.listen()
         listener.settimeout(0.1)
-        contracts, entries = create_native_fixture(workspace, root, listener, args.compiler, args.sdk, args.tools_directory)
+        contracts, _ = create_native_fixture(workspace, root, listener, args.compiler, args.sdk, args.tools_directory)
         if args.native_recovery:
             native = next(item for item in contracts["native"] if item["id"] == "native")
             harness = b'import Darwin\n@main struct Wait { static func main() { sleep(3600) } }\n'
             (workspace / "Harness.swift").write_bytes(harness)
             contracts = {"schemaVersion": 1, "native": [native]}
-            entries = [{"path": "Harness.swift", "digest": hashlib.sha256(harness).hexdigest(), "byteCount": len(harness)}]
-        contracts["architecture"] = [{"id": "cycle", "kind": "cycle", "approved": True}]
+        contracts["architecture"] = [{"id": "cycle", "kind": "cycle"}]
     (workspace / "contracts.json").write_text(json.dumps(contracts))
     base = ["--workspace", str(workspace), "--state", str(root / "invar-state")]
     mcp_processes = []
     explorer = None
     invar_pid = None
     identity = None
-    active_credential = "agent"
     source_identity = None
     log = (root / "explorer.log").open("w")
 
@@ -104,9 +100,8 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
     def rpc(method, params=None):
         return run([host, "rpc", workspace, method, json.dumps(params or {}, separators=(",", ":"))])
 
-    def client(command, payload, credential=None, key="query", expected=0):
-        credential = credential or active_credential
-        return run([host, command, workspace, root / "invar-state", root / (credential + ".secret"), key, json.dumps(payload, separators=(",", ":"))], expected=expected)
+    def client(command, payload, key="query", expected=0):
+        return run([host, command, workspace, root / "invar-state", key, json.dumps(payload, separators=(",", ":"))], expected=expected)
 
     def operation(request, key):
         receipt = client("request", request, key=key)
@@ -145,14 +140,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
         index()
         identity = daemon("identity")
         configuration_digest = run([host, "configuration", workspace, "contracts.json"])["digest"]
-        policy = {"workspaceID": identity["workspaceID"], "engineIdentity": identity["engineIdentity"], "revision": 1,
-                  "peers": [{"binaryDigest": source_identity["binaryDigest"], "capabilities": ["read", "sourceValues", "changes", "planning", "verification", "watching"]}, {"binaryDigest": identity["clientBinaryDigest"], "capabilities": ["read", "sourceValues", "changes", "planning", "verification", "watching"]}],
-                  "approvals": [{"configurationDigest": configuration_digest, "entries": entries}],
-                  "sessionSeconds": 60, "principalSeconds": 900 if args.native else 120, "maximumSessions": 128,
-                  "maximumConnections": 4, "maximumEnvelopeSeconds": 600 if args.native else 60}
-        policy_path = root / "policy.json"
-        policy_path.write_text(json.dumps(policy))
-        daemon("start", "--policy", policy_path, "--contracts", "contracts.json")
+        daemon("start", "--contracts", "contracts.json")
         runtime = Path("/tmp") / ("invar-" + str(os.getuid()) + "-" + identity["workspaceID"][-24:])
         invar_pid = json.loads((runtime / "host-control.json").read_text())["processID"]
         pending = wait_for(lambda: next((value for value in rpc("extensions.pending") if value["manifest"]["extensionID"] == "invar"), None))
@@ -223,7 +211,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
                 prior_epoch = daemon("status")["epoch"]
                 os.kill(invar_pid, signal.SIGKILL)
                 time.sleep(0.3)
-                daemon("start", "--policy", policy_path, "--contracts", "contracts.json")
+                daemon("start", "--contracts", "contracts.json")
                 invar_pid = json.loads((runtime / "host-control.json").read_text())["processID"]
                 wait_for(lambda: daemon("status")["state"] == "ready")
                 assert daemon("status")["epoch"] != prior_epoch
@@ -273,16 +261,6 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             assert len(rpc("extensions.view")["attempts"]) == action_generations
             checks.append("confirmed real Explorer Action uses concrete SDK job receipt, executes original sealed plan, and adopts exactly one publication generation")
             checks.append("repeated confirmation preserves the original job/result/view without another admission or generation")
-        if args.native:
-            refusal = client("request", {"verify": {"planID": plan_id, "changeRevisionID": revision_id}}, key="native-denied", expected=8)
-            assert refusal["code"] == "POLICY_DENIED", refusal
-            policy["revision"] = 2
-            for peer in policy["peers"]:
-                peer["capabilities"].append("nativeExecution")
-            policy_path.write_text(json.dumps(policy))
-            daemon("approve", "--policy", policy_path)
-            active_credential = "native-authorized-agent"
-            checks.append("configuration approval alone cannot execute native code; an actual host native grant and new scoped principal are required")
         if args.native_recovery:
             accepted = client("request", {"verify": {"planID": plan_id, "changeRevisionID": revision_id}}, key="native-interrupted")
             def native_harness():
@@ -301,7 +279,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             prior_epoch = daemon("status")["epoch"]
             os.kill(invar_pid, signal.SIGKILL)
             time.sleep(0.3)
-            daemon("start", "--policy", policy_path, "--contracts", "contracts.json")
+            daemon("start", "--contracts", "contracts.json")
             invar_pid = json.loads((runtime / "host-control.json").read_text())["processID"]
             wait_for(lambda: daemon("status")["state"] == "ready")
             interrupted = wait_for(lambda: terminal(accepted["operationID"]))
@@ -349,7 +327,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             assert replay["id"] != run_id and replay["planID"] == plan_id
             comparison = {item["jobID"]: {"original": [attempts[item["jobID"]]["execution"], attempts[item["jobID"]]["outcome"]], "replay": [item["execution"], item["outcome"]], "diagnostic": item.get("diagnosticCode"), "resources": item["resources"]} for item in replay["attempts"]}
             assert all(item["original"] == item["replay"] for item in comparison.values()), comparison
-            checks.append("actual authenticated daemon executes captured two-module native DAG, expected trap, invalid/empty oracle and seeded fuzz with original100/reduced7 witness")
+            checks.append("actual local daemon executes captured two-module native DAG, expected trap, invalid/empty oracle and seeded fuzz with original100/reduced7 witness")
             checks.append("actual sandbox denies outside file, network, fork, setpgid and setsid; replay independently reproduces the sealed native/fuzz outcomes")
             print(json.dumps({"checks": checks}, indent=2))
             raise SystemExit(0)
@@ -359,7 +337,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
         assert plan["input"]["dependencyStatus"] == "unknown"
         publication = wait_for(lambda: published())
         first = client("query", {"currentView": {}})
-        second = client("query", {"currentView": {}}, credential="second-agent")
+        second = client("query", {"currentView": {}})
         assert first == second and first is not None
         view = client("query", {"view": {"id": first["id"]}})
         assert view["input"]["workspaceID"] == identity["workspaceID"]
@@ -392,14 +370,18 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             assert quiet == watched, (watched, quiet)
             checks.append("daemon watch continues after submitting SDK process exits; quiet probes append no watch revisions")
             (workspace / "Demo.swift").write_text("public func compute(_ value: Int64) -> Int64 { return value + 3 }\n")
+            updated = {**contracts, "architecture": [{"id": "cycle-updated", "kind": "cycle"}]}
+            (workspace / "contracts.json").write_text(json.dumps(updated))
             index()
             changed = wait_for(lambda: watch_ready(watched["lastView"]))
             assert changed["lastPlanID"] != watched["lastPlanID"] and changed["lastRunID"] != watched["lastRunID"], changed
-            checks.append("source event automatically prepares and verifies exact changed input under original fixed watch authority")
+            updated_plan = client("query", {"plan": {"id": changed["lastPlanID"]}})
+            assert updated_plan["configurationDigest"] != configuration_digest
+            checks.append("the watch verifies changed source and configuration together without requiring approval")
             prior_epoch = daemon("status")["epoch"]
             os.kill(invar_pid, signal.SIGKILL)
             time.sleep(0.3)
-            daemon("start", "--policy", policy_path, "--contracts", "contracts.json")
+            daemon("start", "--contracts", "contracts.json")
             invar_pid = json.loads((runtime / "host-control.json").read_text())["processID"]
             wait_for(lambda: daemon("status")["state"] == "ready")
             assert daemon("status")["epoch"] != prior_epoch
@@ -416,12 +398,11 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             assert client("query", {"watch": {"id": watch_id}}) == stopped
             checks.append("explicit watch stop awaits cleanup and source changes cannot create a new cycle afterward")
         if args.frontends:
-            full_caps = "read,sourceValues,changes,planning,verification,watching"
-            frontend_options = [*base, "--client-state", root / "profiles", "--client-profile", "frontends", "--capabilities", full_caps,
+            frontend_options = [*base,
                                 "--run-timeout", "60", "--timeout", "50", "--cpu-seconds", "30"]
 
             def cli(command, *options):
-                return run([binary, command, *frontend_options, *options])
+                return run([binary, command, *(base if command == "status" else frontend_options), *options])
 
             assert cli("status")["workspaceID"] == identity["workspaceID"]
             cli_plan = cli("plan", "--contracts", "contracts.json", "--key", "cli-plan", "--wait", "true")
@@ -433,7 +414,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             assert duplicate == cli_run
             assert cli("source-status")["input"]["workspaceID"] == identity["workspaceID"]
             confirmed_cli_publication = wait_for(lambda: (lambda item: item if item and item["state"] == "committed" else None)(cli("publication","--operation-id",cli_run["id"])))
-            checks.append("actual thin CLI prepares/verifies through daemon; separate processes resume one principal and repeated key retains one original demand")
+            checks.append("actual thin CLI prepares/verifies through daemon; separate processes use one workspace and repeated key retains one original demand")
 
             buffers = {}
 
@@ -463,12 +444,11 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
                     assert len(buffer) <= 1048576, "MCP response exceeded fixture frame bound"
                 raise AssertionError("MCP response timed out")
 
-            def start_mcp(readonly=False):
-                options = [*frontend_options]
-                if readonly:
-                    options[options.index("--client-profile")+1] = "read-only"
-                    options[options.index("--capabilities")+1] = "read"
-                process = subprocess.Popen([str(binary), "mcp", *map(str, options)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+            def start_mcp():
+                plugin = json.loads((ROOT / "plugins/invar/.mcp.json").read_text())["mcpServers"]["invar"]
+                assert plugin["command"] == "invar"
+                invocation = [str(binary), *plugin["args"], *map(str, frontend_options)]
+                process = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
                 mcp_processes.append(process)
                 send(process, {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"Invar process fixture","version":"2"}}})
                 initialized = receive(process,0)
@@ -493,11 +473,10 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
                 assert process.returncode == 0, process.stderr.read().decode()
                 assert not process.stdout.read(), "MCP EOF polluted stdout"
 
-            reader = start_mcp(readonly=True)
+            reader = start_mcp()
             send(reader,{"jsonrpc":"2.0","id":1,"method":"tools/list"})
             names = {item["name"] for item in receive(reader,1)["tools"]}
-            assert "invar_current_view" in names and "invar_run" not in names and "invar_formal_query" not in names
-            assert call_mcp(reader,2,"invar_run",{"key":"denied","planID":cli_plan["resultID"]},error=True)["code"] == "POLICY_DENIED"
+            assert "invar_current_view" in names and "invar_run" in names and "invar_formal_query" in names
             assert call_mcp(reader,3,"invar_current_view",{"workspace":"/another/root"},error=True)["code"] == "INVALID_ARGUMENT"
             close_mcp(reader)
             relay = start_mcp()
@@ -508,7 +487,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             completed = wait_for(lambda: (lambda value: value if value["state"] not in ("queued","running","cancelling") else None)(cli("operation","--operation-id",receipt["operationID"])))
             assert completed["state"] == "completed", completed
             assert cli("receipt","--envelope-id",receipt["id"]) == receipt
-            checks.append("actual local Swift MCP SDK negotiates stdio; scope/schema errors reject escalation and EOF leaves the accepted daemon operation running")
+            checks.append("actual local Swift MCP SDK negotiates stdio; out-of-schema fields are rejected and EOF leaves the accepted daemon operation running")
             relay = start_mcp()
             watch_receipt = call_mcp(relay,1,"invar_watch",{"key":"mcp-watch","configurationPath":"contracts.json"})
             close_mcp(relay)
@@ -527,7 +506,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             stopped_watch = cli("watch-stop","--watch-id",watch_id,"--key","cli-stop-mcp-watch","--wait","true")
             assert stopped_watch["state"] == "completed"
             assert cli("watch-status","--watch-id",watch_id)["state"] == "stopped"
-            checks.append("MCP EOF retains its committed watch; a later independent CLI process stops the same principal's watch and awaits cleanup")
+            checks.append("MCP EOF retains its committed watch; a later independent CLI process stops the workspace watch and awaits cleanup")
             if args.toolchain:
                 formal_evidence = next(item for item in result["attempts"] if item["domain"] == "generatedModel")
                 artifact = next(item for item in formal_evidence["artifacts"] if item["profile"] == "formal-evidence/1")
@@ -552,16 +531,13 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
             old_epoch = call_mcp(relay,1,"invar_status")["epoch"]
             os.kill(invar_pid,signal.SIGKILL)
             time.sleep(0.3)
-            daemon("start","--policy",policy_path,"--contracts","contracts.json")
+            daemon("start","--contracts","contracts.json")
             invar_pid = json.loads((runtime / "host-control.json").read_text())["processID"]
             wait_for(lambda: daemon("status")["state"] == "ready")
-            assert call_mcp(relay,2,"invar_status",error=True)["code"] == "AUTHENTICATION_REQUIRED"
-            refreshed = call_mcp(relay,3,"invar_reconnect")
-            assert refreshed["principal"] == cli_run["principal"]
             assert call_mcp(relay,4,"invar_status")["epoch"] != old_epoch
             assert call_mcp(relay,5,"invar_receipt",{"envelopeID":receipt["id"]}) == receipt
             close_mcp(relay)
-            checks.append("live MCP refreshes the same pinned principal after daemon SIGKILL/restart and reconciles its original receipt without resubmission")
+            checks.append("live MCP reconnects through the same local endpoint after daemon SIGKILL/restart and reconciles its original receipt without resubmission")
         if args.toolchain:
             formal = next(value for value in result["attempts"] if value["domain"] == "generatedModel")
             assert formal["translation"] == "unvalidated" and formal["outcome"] == "holdsWithinScope", formal

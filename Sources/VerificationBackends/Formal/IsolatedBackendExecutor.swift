@@ -10,7 +10,6 @@ public struct IsolatedBackendExecutor: VerificationBackend {
         do {
             if context.job.backend == "project" { return try await ProjectBackend().execute(context) }
             if ["native", "fuzz"].contains(context.job.backend) {
-                guard context.nativeExecutionAllowed else { throw InvarError("POLICY_DENIED", "Host did not authorize native execution", exitCode: 8) }
                 let runner = try NativeSessionExecutor(context: context)
                 let backend = NativeBackend(builder: IsolatedNativeBuilder(executable: executable), runner: runner)
                 return try await backend.execute(context)

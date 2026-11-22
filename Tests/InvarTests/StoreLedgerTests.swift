@@ -7,7 +7,7 @@ import VerificationCore
 struct StoreLedgerTests {
     func envelope(epoch: String,request: WorkspaceOperation,key: String = "request",id: String = UUID().uuidString,now: Double = 100) throws -> RequestEnvelope {
         let fingerprint = try Canonical.identity(request)
-        return RequestEnvelope(id: id,requestKey: key,principal: "authenticated-fixture",workspaceID: "workspace",fingerprint: fingerprint,operation: request.name,daemonEpoch: epoch,policyRevision: 1,expiresAt: now+30,retainUntil: now+60)
+        return RequestEnvelope(id: id,requestKey: key,principal: "authenticated-fixture",workspaceID: "workspace",fingerprint: fingerprint,operation: request.name,daemonEpoch: epoch,expiresAt: now+30,retainUntil: now+60)
     }
     func demand(_ envelope: RequestEnvelope,request: WorkspaceOperation,plan: VerificationPlan,state: String = "queued",revision: Int = 1,result: String? = nil) -> RunDemand {
         RunDemand(id: Canonical.parts("demand",[envelope.id]),envelopeID: envelope.id,principal: envelope.principal,origin: "internal",request: request,planID: plan.id,changeRevisionID: nil,state: state,revision: revision,executionIDs: [],resultID: result,failure: nil)

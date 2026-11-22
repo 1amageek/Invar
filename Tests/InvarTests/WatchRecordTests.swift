@@ -11,13 +11,11 @@ import VerificationStore
         let root: URL
         let plan: VerificationPlan
         let epoch: String
-        let authority: DaemonSessionAuthority
-        let grant: ClientSessionGrant
         let record: WatchRecord
     }
-    func accepted(_ request: WorkspaceOperation,store: SQLiteVerificationStore,grant: ClientSessionGrant,epoch: String,key: String) async throws -> RunDemand {
+    func accepted(_ request: WorkspaceOperation,store: SQLiteVerificationStore,workspaceID: String,epoch: String,key: String) async throws -> RunDemand {
         let now = Date().timeIntervalSince1970, fingerprint = try Canonical.identity(request)
-        let envelope = RequestEnvelope(id: UUID().uuidString,sessionID: grant.session.id,capabilities: grant.session.grants.compactMap(WorkspaceCapability.init(rawValue:)),requestKey: key,principal: grant.session.principal,workspaceID: grant.workspaceID,fingerprint: fingerprint,operation: request.name,daemonEpoch: epoch,policyRevision: grant.session.policyRevision,expiresAt: now+15,retainUntil: now+60)
+        let envelope = RequestEnvelope(id: UUID().uuidString,requestKey: key,principal: "local",workspaceID: workspaceID,fingerprint: fingerprint,operation: request.name,daemonEpoch: epoch,expiresAt: now+15,retainUntil: now+60)
         let issued = try await store.issueEnvelope(envelope,now: now)
         let demand = RunDemand(id: Canonical.parts("invar.operation/2",[issued.id]),envelopeID: issued.id,principal: issued.principal,origin: "internal",request: request,planID: nil,changeRevisionID: nil,state: "queued",revision: 1,executionIDs: [],resultID: nil,failure: nil)
         _ = try await store.acceptDemand(issued,demand: demand,now: now)
@@ -25,20 +23,14 @@ import VerificationStore
         try await store.transitionDemand(running,expectedRevision: 1)
         return running
     }
-    func fixture(shortSession: Bool = false) async throws -> Fixture {
+    func fixture() async throws -> Fixture {
         let (store,plan,root) = try await SchedulerTests.setup(jobs: [SchedulerTests.job("a")])
-        let peer = try ConnectionPeer.current(), epoch = UUID().uuidString
-        let capabilities: Set<WorkspaceCapability> = [.read,.planning,.verification,.watching]
-        let base = DaemonAuthorityTests().policy(plan: plan,peer: peer,capabilities: capabilities)
-        let policy = WorkspacePolicy(workspaceID: base.workspaceID,engineIdentity: base.engineIdentity,revision: base.revision,peers: base.peers,approvals: base.approvals,sessionSeconds: shortSession ? 2 : base.sessionSeconds,principalSeconds: base.principalSeconds,maximumSessions: base.maximumSessions,maximumConnections: base.maximumConnections,maximumEnvelopeSeconds: base.maximumEnvelopeSeconds)
-        try await store.savePolicy(policy,expectedRevision: 0)
+        let epoch = UUID().uuidString
         try await store.activateEpoch(epoch,engineIdentity: plan.body.executorIdentity)
-        let authority = DaemonSessionAuthority(repository: store,epoch: epoch)
-        let grant = try await authority.open(peer: peer,label: "watch-fixture",requested: capabilities)
-        let demand = try await accepted(.watch(configurationPath: "contracts.json",budget: RunBudget()),store: store,grant: grant,epoch: epoch,key: "watch")
-        let principal = try #require(try await store.principal(identity: grant.session.principal))
-        let record = WatchRecord(id: demand.id,envelopeID: demand.envelopeID,workspaceID: grant.workspaceID,principal: principal.principal,policyRevision: policy.revision,capabilities: principal.capabilities,configurationPath: "contracts.json",budget: RunBudget(),expiresAt: principal.expiresAt)
-        return Fixture(store: store,root: root,plan: plan,epoch: epoch,authority: authority,grant: grant,record: record)
+        let demand = try await accepted(.watch(configurationPath: "contracts.json",budget: RunBudget()),store: store,workspaceID: plan.body.input.workspaceID,epoch: epoch,key: "watch")
+        let record = WatchRecord(id: demand.id,envelopeID: demand.envelopeID,workspaceID: plan.body.input.workspaceID,
+            principal: "local",configurationPath: "contracts.json",budget: RunBudget(),expiresAt: Date.distantFuture.timeIntervalSince1970)
+        return Fixture(store: store,root: root,plan: plan,epoch: epoch,record: record)
     }
     func register(_ value: Fixture) async throws -> WatchRecord {
         try await value.store.createWatch(value.record)
@@ -47,16 +39,16 @@ import VerificationStore
         try await value.store.completeDemand(terminal,run: nil,view: nil,expectedRevision: parent.revision)
         return try await value.store.loadWatch(value.record.id)
     }
-    @Test func originalAuthorityAndCycleReferencesSurviveReopenButCannotBeExtendedOrForged() async throws {
+    @Test func watchCycleReferencesSurviveReopenButCannotBeExtendedOrForged() async throws {
         let value = try await fixture()
         let record = try await register(value)
-        let demand = try await accepted(.preparePlan(configurationPath: "contracts.json",changeRevisionID: nil,budget: value.record.budget),store: value.store,grant: value.grant,epoch: value.epoch,key: "prepare")
+        let demand = try await accepted(.preparePlan(configurationPath: "contracts.json",changeRevisionID: nil,budget: value.record.budget),store: value.store,workspaceID: value.record.workspaceID,epoch: value.epoch,key: "prepare")
         let preparing = record.revising(state: "active",cycle: WatchCycle(generation: 1,phase: "preparing",pendingDemandID: demand.id))
         try await value.store.saveWatch(preparing,expectedRevision: record.revision)
-        let forged = WatchRecord(id: preparing.id,envelopeID: preparing.envelopeID,workspaceID: preparing.workspaceID,principal: preparing.principal,policyRevision: preparing.policyRevision,capabilities: preparing.capabilities+[.nativeExecution],configurationPath: preparing.configurationPath,budget: preparing.budget,expiresAt: preparing.expiresAt+1,revision: preparing.revision+1,state: "active",cycle: preparing.cycle)
+        let forged = WatchRecord(id: preparing.id,envelopeID: preparing.envelopeID,workspaceID: preparing.workspaceID,principal: preparing.principal,configurationPath: preparing.configurationPath,budget: preparing.budget,expiresAt: preparing.expiresAt+1,revision: preparing.revision+1,state: "active",cycle: preparing.cycle)
         await #expect(throws: InvarError.self) { try await value.store.saveWatch(forged,expectedRevision: preparing.revision) }
         #expect(try await value.store.loadWatch(preparing.id) == preparing)
-        await value.authority.shutdown(); try await value.store.shutdown()
+        try await value.store.shutdown()
         let reopened = try SQLiteVerificationStore(root: value.root)
         #expect(try await reopened.loadWatch(preparing.id) == preparing)
         let paused = preparing.revising(state: "paused",failure: InvarError("TEST_PAUSE","Explicit test pause"))
@@ -72,36 +64,18 @@ import VerificationStore
         #expect(try await reopened.watches(states: ["active","paused"]).isEmpty)
         try await reopened.shutdown(); try FileManager.default.removeItem(at: value.root)
     }
-    @Test func revocationBlocksFreshWorkWithoutRemovingHistoricalWatchOrCleanupAuthority() async throws {
+    @Test func derivedWatchRequestUsesFixedConfigurationAndDeadline() async throws {
         let value = try await fixture()
-        let record = try await register(value)
-        let peer = try ConnectionPeer.current(), revoked = DaemonAuthorityTests().policy(plan: value.plan,peer: peer,revision: 2,capabilities: [.read])
-        try await value.store.savePolicy(revoked,expectedRevision: 1)
-        let next = record.revising(state: "active",cycle: WatchCycle(generation: 1,phase: "preparing"))
-        await #expect(throws: InvarError.self) { try await value.store.saveWatch(next,expectedRevision: record.revision) }
-        let stopped = record.revising(state: "stopped")
-        try await value.store.saveWatch(stopped,expectedRevision: record.revision)
-        #expect(try await value.store.loadWatch(stopped.id).state == "stopped")
-        await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root)
-    }
-    @Test func derivedWatchRequestSurvivesAgentSessionExpiryWithoutWideningAuthorityOrDeadline() async throws {
-        let value = try await fixture(shortSession: true)
         defer {
-            await value.authority.shutdown()
             do { try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let record = try await register(value)
         let preparing = record.revising(state: "active",cycle: WatchCycle(generation: 1,phase: "preparing"))
         try await value.store.saveWatch(preparing,expectedRevision: record.revision)
-        let remaining = value.grant.session.expiresAt-Date().timeIntervalSince1970
-        if remaining > 0 { try await Task.sleep(for: .seconds(remaining+0.03)) }
-        let peer = try ConnectionPeer.current()
-        await #expect(throws: InvarError.self) { try await value.authority.authenticate(credential: value.grant.credential,epoch: value.epoch,peer: peer) }
         let operation = WorkspaceOperation.preparePlan(configurationPath: preparing.configurationPath,changeRevisionID: nil,budget: preparing.budget)
         let now = Date().timeIntervalSince1970
         let envelope = try await value.store.issueWatchEnvelope(watchID: preparing.id,operation: operation,epoch: value.epoch,now: now)
-        #expect(envelope.sessionID == nil && envelope.watchID == preparing.id && envelope.hasCapabilityCeiling)
-        #expect(envelope.capabilities == preparing.capabilities && !envelope.capabilities.contains(.nativeExecution))
+        #expect(envelope.watchID == preparing.id && envelope.expiresAt <= now + preparing.budget.runTimeoutSeconds)
         let duplicate = try await value.store.issueWatchEnvelope(watchID: preparing.id,operation: operation,epoch: value.epoch,now: now+0.01)
         #expect(duplicate == envelope)
         try await value.store.validateWatchRequest(envelope,operation: operation,now: now)
@@ -122,7 +96,6 @@ import VerificationStore
     @Test(arguments: [false,true]) func registrationStaysNonrunnableUntilParentCommitAndFailureNeverEnablesIt(_ cancel: Bool) async throws {
         let value = try await fixture()
         defer {
-            await value.authority.shutdown()
             do { try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         try await value.store.createWatch(value.record)
@@ -147,7 +120,6 @@ import VerificationStore
     @Test func verificationCannotUseAnUnpreparedPlanFromAnotherCycle() async throws {
         let value = try await fixture()
         defer {
-            await value.authority.shutdown()
             do { try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let active = try await register(value)
@@ -165,7 +137,7 @@ import VerificationStore
 extension WatchRecordTests {
     @Test func pauseCleanupCannotOverwriteAConcurrentDurableStop() async throws {
         let value = try await fixture()
-        defer { do { await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) } }
+        defer { do { try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) } }
         let registered = try await register(value)
         let paused = try await value.store.pauseWatch(registered.id,failure: InvarError("POLICY_DENIED","Authority revoked"))
         #expect(paused.state == "paused")

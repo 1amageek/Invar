@@ -15,14 +15,6 @@ public enum WorkspaceOperation: Codable, Sendable, Equatable {
         return nil
     }
 
-    public var requiredCapability: WorkspaceCapability {
-        switch self {
-        case .openChange,.sealChange: .changes
-        case .preparePlan: .planning
-        case .verify,.reconcile,.cancel: .verification
-        case .watch,.stopWatch: .watching
-        }
-    }
     public var name: String {
         switch self {
         case .openChange: "change.open"

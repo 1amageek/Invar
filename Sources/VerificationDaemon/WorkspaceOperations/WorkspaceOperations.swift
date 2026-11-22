@@ -21,8 +21,8 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
         self.source = source; self.repository = repository; self.resources = resources; self.workspace = workspace; self.workspaceID = workspaceID
         self.epoch = epoch; engine = engineIdentity; self.defaultConfigurationPath = defaultConfigurationPath; self.scratchFiles = scratchFiles
     }
-    public func execute(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
-        guard !stopped, demand.principal == authority.principal else { throw InvarError("POLICY_DENIED","Workspace operation authority differs or admission is closed",exitCode: 8) }
+    public func execute(_ demand: RunDemand) async throws -> String {
+        guard !stopped else { throw InvarError("COORDINATOR_STOPPED","Workspace operation admission is closed",exitCode: 6) }
         let budget: RunBudget
         if case .preparePlan(_,_,let selected) = demand.request { budget = selected } else { budget = RunBudget() }
         try PlanValidation.budget(budget)
@@ -35,17 +35,14 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
         case .openChange(let claim,let configurationPath):
             let captured = try await capture(configurationPath: configurationPath ?? defaultConfigurationPath)
             let input = try VerificationInput.reference(captured.inventory)
-            let envelope: RequestEnvelope?
-            if demand.origin == "internal" { envelope = try await repository.loadEnvelope(demand.envelopeID) } else { envelope = nil }
-            let record = ChangeRecord(id: Canonical.parts("invar.change/2",[demand.id]),workspaceID: workspaceID,ownerPrincipal: authority.principal,sessionID: envelope?.sessionID,baseline: input,claim: claim,state: "open",revision: 1,sealedRevisionID: nil)
+            let record = ChangeRecord(id: Canonical.parts("invar.change/2",[demand.id]),workspaceID: workspaceID,ownerPrincipal: demand.principal,sessionID: nil,baseline: input,claim: claim,state: "open",revision: 1,sealedRevisionID: nil)
             try await repository.createChange(record); return record.id
-        case .sealChange(let id): return try await seal(id,principal: authority.principal)
+        case .sealChange(let id): return try await seal(id)
         case .preparePlan(let path,let changeRevisionID,_):
             let captured: CapturedWorkspace
             if let changeRevisionID {
                 let revision = try await repository.loadChangeRevision(changeRevisionID)
-                let change = try await repository.loadChange(revision.changeID)
-                guard change.ownerPrincipal == authority.principal, revision.after.workspaceID == workspaceID else { throw InvarError("POLICY_DENIED","Sealed change belongs to another principal/workspace",exitCode: 8) }
+                guard revision.after.workspaceID == workspaceID else { throw InvarError("INPUT_MISMATCH","Sealed change belongs to another workspace",exitCode: 2) }
                 captured = try await repository.capture(revision.after)
             } else { captured = try await capture(configurationPath: path) }
             return try await prepare(captured,path: path,demandID: demand.id,budget: budget)
@@ -108,7 +105,7 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
             guard entity.supportsModelSelection, FormalBackend.supportsModelLanguage(entity.language) else {
                 throw InvarError("UNSUPPORTED_SOURCE_PROFILE","Select an implementation file, free function or supported Swift declaration")
             }
-            let job = VerificationJob(id: "generate-model",backend: "modelGeneration",required: false,approved: true,
+            let job = VerificationJob(id: "generate-model",backend: "modelGeneration",required: false,
                 inputs: [entry],memoryMiB: 1024,modelSource: entity)
             _ = try await repository.saveInput(original)
             let input = try VerificationInput.reference(original.inventory)
@@ -142,10 +139,6 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
             config.native.isEmpty, config.fuzz.isEmpty, config.architecture.isEmpty, config.project == nil else {
             throw InvarError("INVALID_REQUEST","Use a node-specific invar.json beside this specification to run only its formal checks")
         }
-        let approval = try ContractApproval(configurationDigest: config.identity(),entries: [InputEntry(path: specification,digest: Canonical.digest(bytes),byteCount: bytes.count)])
-        guard let policy = try await repository.loadPolicy(), policy.approvals.contains(approval) else {
-            throw InvarError("APPROVAL_REQUIRED","The selected model configuration and specification require exact host approval")
-        }
         let captured = try WorkspaceContractFiles(workspace: workspace).augment(original,inputs: [path:configBytes,specification:bytes])
         _ = try await repository.saveInput(captured)
         let input = try VerificationInput.reference(captured.inventory)
@@ -156,7 +149,7 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
         guard !stopped, binding.workspaceID == workspaceID, binding.entityIDs.count == 1, let subject = binding.entityIDs.first else { throw InvarError("INPUT_MISMATCH","Project verification requires one original subject") }
         let files = WorkspaceContractFiles(workspace: workspace)
         let bytes = try files.read(configurationPath), configuration = try ConfigurationReader.decode(bytes)
-        guard let project = configuration.project, project.subjectID == subject, project.approved,
+        guard let project = configuration.project, project.subjectID == subject,
             configuration.formal.isEmpty, configuration.native.isEmpty, configuration.fuzz.isEmpty, configuration.architecture.isEmpty else { throw InvarError("INVALID_CONFIGURATION","Use a project-only configuration for the selected workspace, system or container") }
         guard let projectSource = source as? any ProjectArchitectureReading else { throw InvarError("UNSUPPORTED_CAPABILITY","Source adapter cannot capture project inputs") }
         let original = try await projectSource.captureProject(snapshotID: binding.snapshotID,entityID: subject)
@@ -172,9 +165,9 @@ public actor WorkspaceOperations: WorkspaceOperationExecuting, InputApplicabilit
         _ = try await repository.observeInput(input,epoch: epoch)
         return try await prepare(captured,path: configurationPath,demandID: UUID().uuidString,budget: project.budget)
     }
-    private func seal(_ id: String,principal: String) async throws -> String {
+    private func seal(_ id: String) async throws -> String {
         let change = try await repository.loadChange(id)
-        guard change.workspaceID == workspaceID, change.ownerPrincipal == principal else { throw InvarError("POLICY_DENIED","Only the original principal may seal this change",exitCode: 8) }
+        guard change.workspaceID == workspaceID else { throw InvarError("POLICY_DENIED","Change belongs to another workspace",exitCode: 8) }
         if let retained = change.sealedRevisionID { return retained }
         let before = try await repository.capture(change.baseline)
         let extras = before.inventory.metadata.keys.filter { $0.hasPrefix("@invar.extra:") }.map { String($0.dropFirst("@invar.extra:".count)) }

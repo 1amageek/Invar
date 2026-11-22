@@ -27,16 +27,16 @@ Preserve exact input identity, separate execution/property/domain/translation/ap
 A validated plan has safe unique job IDs, a bounded acyclic dependency graph, feasible positive resource declarations, an exact inventory content identity and a pinned executor digest. Evidence must match both job identity and backend domain. Unknown status strings are rejected at the worker/store boundary. Input applicability compares all original bytes/context/provider identities, independently of index generation.
 
 ### Public client ports
-These proposed domain protocols are implemented by VerificationClient; the daemon supplies their authorized operations:
+These proposed domain protocols are implemented by VerificationClient; the daemon supplies their local operations:
 | Protocol | Operations |
 |---|---|
 | `ChangeTracking` | begin, seal, abandon and inspect fixed change revisions |
 | `VerificationPlanningClient` | prepare a plan asynchronously, inspect preparation and sealed plan |
 | `VerificationRunningClient` | submit/replay fixed plan, inspect/cancel own run demand |
-| `EvidenceQuerying` | read common change view, bounded graph/trace/origin pages and authorized artifact ranges |
-| `WorkspaceWatching` | register/update/disable durable authorized watch; inspect its state |
+| `EvidenceQuerying` | read common change view, bounded graph/trace/origin pages and bounded artifact ranges |
+| `WorkspaceWatching` | register/update/disable durable workspace watch; inspect its state |
 | `WorkspaceEventSubscribing` | subscribe after cursor, explicit resync and shutdown |
-| `WorkspaceAdministration` | daemon status/start/stop and policy administration, granted only to host-user principals |
+| `WorkspaceAdministration` | daemon status, start and stop for the owning macOS user |
 
 ## State, Ownership, and Lifecycle
 Invocation-local values or module-owned actors; no shared mutable global or target-specific synchronization. Active resource owners provide explicit shutdown/cleanup.
@@ -57,14 +57,14 @@ Configuration identity sorts obligations by stable ID within each backend, since
 A `JobDescriptor` contains one validated obligation, its sparse exact input entries, immutable input reference, executor and budgets. It never embeds the complete plan or source/catalog bytes. Plan validation and worker validation use the same per-job contract. Formal/native/fuzz descriptors must name exactly their enforced source/oracle read set, with unique safe paths and digests. The plan binder verifies every sparse entry against the captured manifest before storage. Static descriptors bind the independently audited graph digest. Worker checksum validation detects mutation but does not confer execution permission.
 
 ### Daemon authority records
-`WorkspacePolicy` is a revisioned host decision binding engine/workspace, approved peer executable identities/capabilities, and exact configuration/oracle/harness/corpus approvals. `PrincipalGrant` records original capability ceilings, credential digest, code identity and expiry. Live session credentials additionally bind the actual OS audit identity. Resuming cannot extend the original grant expiry or add capabilities. Policy persistence is a narrow port; no public namespace/payload writer is introduced.
+A daemon is owned by a macOS user and a canonical workspace. Local requests carry workspace, epoch, a deadline and a fixed operation fingerprint. The daemon retains its own tool and budget checks.
 
 FormalCheck optionally declares memoryMiB. Its admissionMemoryMiB uses that explicit value, otherwise the named finite/quantified development defaults (1536/2560 MiB). Plan construction and validation bind JobReference/descriptor memory to that exact configuration value; admission refuses it when it cannot fit the host/request. The isolated process monitor enforces the same declared aggregate RSS limit. A resource-limited attempt is not a proof. Actual toolchain integration may select a larger explicit budget and reports observed peak RSS; no silent retry raises the limit.
 
 SourceEventReading is a single workspace-owned metadata cursor. Its SourceEvent keeps source availability, invalidation and continuity loss distinct. A ready event permits requesting a fresh fixed capture; it is not itself captured input or verification evidence.
 
-SchedulingPlan.capturedScopeDigest binds the complete captured input semantic digest, executor, normalized configuration, approved contract entries, run budget and every original job/profile/tool/input/compilation declaration. It excludes only plan/index snapshot identity. It supports exact whole-captured-scope reassociation under a fresh source fence; it is not a shared-job cache key and never removes upstream unknown boundaries. Changed tools, context, raw input/graph/coverage, budget or obligations change this digest.
+SchedulingPlan.capturedScopeDigest binds the complete captured input semantic digest, executor, normalized configuration, captured contract entries, run budget and every original job/profile/tool/input/compilation declaration. It excludes only plan/index snapshot identity. It supports exact whole-captured-scope reassociation under a fresh source fence; it is not a shared-job cache key and never removes upstream unknown boundaries. Changed tools, context, raw input/graph/coverage, budget or obligations change this digest.
 
-WatchControlling is the authenticated client port for durable register/stop operations plus per-principal watch records. Registration and stop return normal durable receipts; disconnect detaches observation. Watch queries expose bounded current registrations for the requesting principal and exact historical records by ID, without private source/evidence payloads. Daemon status counts committed registering/active/paused/stopping records from WatchRepository, not an independent in-memory watch list.
+WatchControlling registers and stops durable workspace watches and reads their recorded state. Registration and stop return operation receipts. The daemon counts committed watches from WatchRepository.
 
 VerificationInput.sourceIdentity separates one source authority observation from per-plan contract/oracle extras. For Explorer captures it binds workspace, snapshot, context, graph digest and the single original owner manifest bytes; the authenticated adapter validates those owner bytes. Captures without an owner manifest use the explicitly distinct captured-scope identity domain and retain their full semantic scope, without claiming Explorer authority. semanticDigest/capturedScopeDigest still include every contract/oracle extra and control reuse independently.

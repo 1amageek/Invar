@@ -15,17 +15,29 @@ Build a temporary host through the public ArchitectureDaemon composition API and
 ## Architecture
 ```text
 owned host process + actual ArchitectureService -> approved Invar Provider
-owned host CLI -> authenticated Invar Client -> common committed records
+owned host CLI -> same-user Invar Client -> common committed records
 ```
 
 ## Contracts and Invariants
 The host pins its own actual executable; only that helper can approve the test Provider. All state/processes are tied to the unique fixture workspace. Source files, source graph, approvals and protocol messages follow the real public implementations. No mock success or user UI/server state is used.
 
 ## Verification and Change Impact
-The bounded integration driver owns setup, assertions and cleanup. Recheck the actual owner SDK when its fingerprint changes. This fixture establishes transport/source/record integration; it does not claim visual renderer correctness without separate renderer evidence.
+The bounded integration driver owns setup, assertions and cleanup.
+Use a temporary SwiftPM scratch directory from the Invar root to build the fixture against the checkout.
+
+```sh
+fixture=Tests/Fixtures/ExplorerHost
+scratch=$(mktemp -d)
+swift package --package-path "$fixture" --scratch-path "$scratch" resolve
+swift package --package-path "$fixture" --scratch-path "$scratch" edit invar --path "$PWD"
+swift build --package-path "$fixture" --build-path "$scratch" --product InvarExplorerHost
+python3 Tools/verify-explorer-daemon.py --host "$scratch/debug/InvarExplorerHost" --actions --watch --frontends
+```
+
+ Recheck the actual owner SDK when its fingerprint changes. This fixture establishes transport/source/record integration; it does not claim visual renderer correctness without separate renderer evidence.
 
 Child: [distinct Provider failure executable](Sources/InvarConnectionFailure/DESIGN.md). It must have a different binary digest from the Explorer host so source disconnect uses the ordinary Provider authorization branch.
 
-The optional --watch integration path detaches submitting SDK processes, checks quiet monitoring, edits actual source, kills/restarts the owned Invar daemon and stops the retained watch. It verifies fixed original principal lifetime and original run preservation on exact-scope reassociation, separately from expensive Formal tool checks.
+The optional --watch integration path detaches submitting SDK processes, checks quiet monitoring, edits actual source, kills/restarts the owned Invar daemon and stops the retained watch. It verifies workspace-owned lifetime and original run preservation on exact-scope reassociation, separately from expensive Formal tool checks.
 
-Optional --actions exercises actual Source prepare/confirm, concrete SDK receipts, original-run publication adoption, cancellation and SIGKILL/no external restart with real TLC/Lean workers. --native owns a separate explicit toolchain/host-grant run for actual native modules, sandbox/oracle failures, fuzz shrinking and replay. It does not share a user server.
+Optional --actions exercises actual Source prepare/confirm, concrete SDK receipts, original-run publication adoption, cancellation and SIGKILL/no external restart with real TLC/Lean workers. --native owns a separate explicit toolchain run for actual native modules, sandbox/oracle failures, fuzz shrinking and replay. It does not share a user server.

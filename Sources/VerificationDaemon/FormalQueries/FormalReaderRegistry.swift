@@ -6,8 +6,6 @@ import VerificationFormal
 public actor FormalReaderRegistry: FormalReadServing {
     private struct Entry {
         let lease: FormalReadLease
-        let principal: String
-        let sessionID: String
         let reader: any FormalEvidenceReading
         let pinID: String
     }
@@ -25,23 +23,22 @@ public actor FormalReaderRegistry: FormalReadServing {
         self.repository = repository; self.workspaceID = workspaceID; self.epoch = epoch; self.policy = policy
     }
     public var activeCount: Int { entries.count + closing.count + reservations }
-    public func query(_ query: FormalReadQuery,session: AgentSession,epoch: String) async throws -> FormalReadResult {
-        guard !stopped, self.epoch == epoch, session.expiresAt > Date().timeIntervalSince1970, Set(session.grants).isSuperset(of: ["read","sourceValues"]) else { throw InvarError("POLICY_DENIED","Private formal reads require a current read/sourceValues session",exitCode: 8) }
+    public func query(_ query: FormalReadQuery,epoch: String) async throws -> FormalReadResult {
+        guard !stopped, self.epoch == epoch else { throw InvarError("POLICY_DENIED","Formal reader is closed or belongs to another epoch",exitCode: 8) }
         do {
             switch query {
-            case .open(let evidenceID,let reference,let budget): return .opened(try await open(evidenceID,reference: reference,budget: budget,session: session))
-            case .catalog(let handle): let entry = try lookup(handle,session: session); return .catalog(try await entry.reader.catalog())
-            case .graph(let handle,let query): let entry = try lookup(handle,session: session); return .graph(try await entry.reader.graph(query))
-            case .trace(let handle,let query): let entry = try lookup(handle,session: session); return .trace(try await entry.reader.trace(query))
-            case .origins(let handle,let query): let entry = try lookup(handle,session: session); return .origins(try await entry.reader.origins(query))
-            case .document(let handle,let query): let entry = try lookup(handle,session: session); return .document(try await entry.reader.document(query))
+            case .open(let evidenceID,let reference,let budget): return .opened(try await open(evidenceID,reference: reference,budget: budget))
+            case .catalog(let handle): let entry = try lookup(handle); return .catalog(try await entry.reader.catalog())
+            case .graph(let handle,let query): let entry = try lookup(handle); return .graph(try await entry.reader.graph(query))
+            case .trace(let handle,let query): let entry = try lookup(handle); return .trace(try await entry.reader.trace(query))
+            case .origins(let handle,let query): let entry = try lookup(handle); return .origins(try await entry.reader.origins(query))
+            case .document(let handle,let query): let entry = try lookup(handle); return .document(try await entry.reader.document(query))
             case .close(let handle):
-                if let entry = entries[handle] { try checkOwner(entry,session: session) }
                 try await close(handle); return .closed
             }
         } catch let error as FormalEvidenceError { throw Self.failure(error) }
     }
-    private func open(_ evidenceID: String,reference: EvidenceBundleReference,budget: EvidenceReadBudget,session: AgentSession) async throws -> FormalReadLease {
+    private func open(_ evidenceID: String,reference: EvidenceBundleReference,budget: EvidenceReadBudget) async throws -> FormalReadLease {
         try policy.accepts(budget); try await expire(); try Task.checkCancellation()
         guard !stopped, entries.count + closing.count + reservations < policy.maximumReaders else { throw InvarError("RESOURCE_LIMIT","Formal reader admission is closed or full",exitCode: 6) }
         reservations += 1; defer { finishReservation() }
@@ -51,8 +48,8 @@ public actor FormalReaderRegistry: FormalReadServing {
             let artifact = evidence.artifacts.first(where: { $0.id == reference.id && $0.sha256 == reference.sha256 && $0.byteCount == reference.byteCount && $0.mediaType == "application/vnd.formal.evidence.sqlite" && $0.profile == "formal-evidence/1" }) else { throw InvarError("POLICY_DENIED","Bundle is not owned by this workspace evidence",exitCode: 8) }
         try Task.checkCancellation()
         guard !stopped else { throw InvarError("SESSION_CLOSED","Formal readers are draining") }
-        let id = UUID().uuidString, expiry = min(session.expiresAt,Date().timeIntervalSince1970 + policy.leaseSeconds)
-        let pin = RetentionPin(id: id,ownerKind: "formalReader",ownerID: session.id,objectKind: "evidence",objectID: evidenceID,expiresAt: expiry + 60)
+        let id = UUID().uuidString, expiry = Date().timeIntervalSince1970 + policy.leaseSeconds
+        let pin = RetentionPin(id: id,ownerKind: "formalReader",ownerID: id,objectKind: "evidence",objectID: evidenceID,expiresAt: expiry + 60)
         try await repository.pin(pin)
         var opened: (any FormalEvidenceReading)?
         do {
@@ -63,7 +60,7 @@ public actor FormalReaderRegistry: FormalReadServing {
             try Task.checkCancellation()
             guard !stopped, expiry > Date().timeIntervalSince1970 else { throw InvarError("READ_LEASE_EXPIRED","Formal reader expired during open",exitCode: 6) }
             let lease = FormalReadLease(id: id,epoch: epoch,evidenceID: evidenceID,reference: reference,expiresAt: expiry)
-            entries[id] = Entry(lease: lease,principal: session.principal,sessionID: session.id,reader: reader,pinID: pin.id)
+            entries[id] = Entry(lease: lease,reader: reader,pinID: pin.id)
             return lease
         } catch {
             let original = error
@@ -75,12 +72,9 @@ public actor FormalReaderRegistry: FormalReadServing {
             throw original
         }
     }
-    private func lookup(_ id: String,session: AgentSession) throws -> Entry {
+    private func lookup(_ id: String) throws -> Entry {
         guard let value = entries[id], value.lease.expiresAt > Date().timeIntervalSince1970 else { throw InvarError("READ_LEASE_EXPIRED","Formal read lease is absent or expired",exitCode: 6) }
-        try checkOwner(value,session: session); return value
-    }
-    private func checkOwner(_ entry: Entry,session: AgentSession) throws {
-        guard entry.principal == session.principal, entry.sessionID == session.id else { throw InvarError("POLICY_DENIED","Formal reader belongs to another principal/session",exitCode: 8) }
+        return value
     }
     private func close(_ id: String) async throws {
         if let task = closing[id] { try await task.value; return }

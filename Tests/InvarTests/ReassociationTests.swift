@@ -33,7 +33,7 @@ import VerificationStore
     }
     func envelope(_ operation: WorkspaceOperation,store: SQLiteVerificationStore,workspace: String,epoch: String) async throws -> RequestEnvelope {
         let now = Date().timeIntervalSince1970, fingerprint = try Canonical.identity(operation)
-        let value = RequestEnvelope(id: UUID().uuidString,requestKey: UUID().uuidString,principal: "agent",workspaceID: workspace,fingerprint: fingerprint,operation: operation.name,daemonEpoch: epoch,policyRevision: 1,expiresAt: now+15,retainUntil: now+30)
+        let value = RequestEnvelope(id: UUID().uuidString,requestKey: UUID().uuidString,principal: "agent",workspaceID: workspace,fingerprint: fingerprint,operation: operation.name,daemonEpoch: epoch,expiresAt: now+15,retainUntil: now+30)
         return try await store.issueEnvelope(value,now: now)
     }
     @Test(arguments: [false,true]) func sameCapturedScopeCreatesNewViewAndOriginalAxesWithoutAnotherBackendCall(_ priorUnknown: Bool) async throws {
@@ -42,7 +42,7 @@ import VerificationStore
         try await store.activateEpoch(epoch,engineIdentity: original.body.executorIdentity)
         _ = try await store.observeInput(original.body.input,epoch: epoch)
         let scheduler = VerificationScheduler(backend: backend,repository: store,applicability: Current(unknown: priorUnknown ? ["Upstream project dependency closure remains unknown"] : []))
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: DurableCoordinatorTests.Authorization(),operations: DurableCoordinatorTests.Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: epoch,maximumDemands: 8)
         defer {
             do { try await coordinator.shutdown(); try await store.shutdown(); try FileManager.default.removeItem(at: root) } catch { Issue.record(error) }
         }
@@ -73,7 +73,7 @@ import VerificationStore
         let backend = CountingStatic(), epoch = UUID().uuidString
         try await store.activateEpoch(epoch,engineIdentity: original.body.executorIdentity)
         let scheduler = VerificationScheduler(backend: backend,repository: store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: DurableCoordinatorTests.Authorization(),operations: DurableCoordinatorTests.Operations(),epoch: epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: epoch,maximumDemands: 8)
         defer {
             do { try await coordinator.shutdown(); try await store.shutdown(); try FileManager.default.removeItem(at: root) } catch { Issue.record(error) }
         }

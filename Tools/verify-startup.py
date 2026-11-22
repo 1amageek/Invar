@@ -107,7 +107,7 @@ def verify_browser(nested, state, workspace_id):
             time.sleep(0.05)
         invar_status = invoke([binary, 'status', *state], nested)
         assert invar_status['workspaceID'] == workspace_id
-        assert invar_status['state'] == 'approvalRequired' and invar_status['policyRevision'] == 0
+        assert invar_status['protocolVersion'] == 3 and 'policyRevision' not in invar_status
         return invar_status['epoch']
     finally:
         process.terminate()
@@ -127,9 +127,10 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     subprocess.run(['/usr/bin/git', 'init', '--quiet', str(workspace)], check=True, timeout=8)
     (nested / 'Fixture.swift').write_text('public func answer() -> Int { 42 }\n')
     state = ['--state', str(root / 'state')]
-    profiles = ['--client-state', str(root / 'clients'), '--capabilities', 'read']
-    mcp = [binary, 'mcp', *state, *profiles]
+    mcp = [binary, 'mcp', *state]
     assert invoke([binary, 'status', *state], root, 2)['code'] == 'WORKSPACE_REQUIRED'
+    assert invoke([binary, 'daemon', 'approve', *state], nested, 2)['code'] == 'INVALID_ARGUMENT'
+    assert invoke([*mcp, '--client-profile', 'legacy'], nested, 2)['code'] == 'INVALID_ARGUMENT'
     incomplete_install = root / 'invar-without-bundle'
     shutil.copy2(binary, incomplete_install)
     assert invoke([incomplete_install, '--no-open', *state], nested, 3)['code'] == 'EXPLORER_UNAVAILABLE'
@@ -146,28 +147,22 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     linked = invoke([binary, 'daemon', 'identity', *state], worktree / 'Sources')
     assert linked['workspaceID'] == invoke([binary, 'daemon', 'identity', '--workspace', str(worktree), *state], root)['workspaceID']
     assert linked['workspaceID'] != identity['workspaceID']
-    assert invoke(mcp, nested, 8)['code'] == 'APPROVAL_REQUIRED'
-    assert not (root / 'state' / 'verification.sqlite').exists()
-    policy = root / 'policy.json'
-    policy.write_text(json.dumps({
-        'workspaceID': identity['workspaceID'], 'engineIdentity': identity['engineIdentity'], 'revision': 1,
-        'peers': [{'binaryDigest': identity['clientBinaryDigest'], 'capabilities': ['read']}], 'approvals': [],
-        'sessionSeconds': 30, 'principalSeconds': 120, 'maximumSessions': 8, 'maximumConnections': 4,
-        'maximumEnvelopeSeconds': 60,
-    }))
     owned = False
     index_socket = Path("/tmp") / f"ae-{os.getuid()}-{identity['workspaceID'][-24:]}" / "rpc.sock"
     runtime = Path('/tmp') / f"invar-{os.getuid()}-{identity['workspaceID'][-24:]}"
     try:
+        assert not (root / 'state' / 'verification.sqlite').exists()
+        cold = mcp_status(mcp, nested)
+        assert cold['workspaceID'] == identity['workspaceID'] and cold['protocolVersion'] == 3
         browser_epoch = verify_browser(nested, state, identity['workspaceID'])
-        assert invoke([binary, 'status', *state], nested)['epoch'] == browser_epoch
+        assert invoke([binary, 'status', *state], nested)['epoch'] == browser_epoch == cold['epoch']
         invoke([binary, 'stop', '--deadline', '2', *state], nested)
         subprocess.run([explorer, 'stop', '--workspace', str(workspace)], env=environment, check=True, timeout=8)
         deadline = time.monotonic() + 8
         while index_socket.exists():
             assert time.monotonic() < deadline, 'The bundled index did not release its socket'
             time.sleep(0.05)
-        start = [binary, 'daemon', 'start', '--policy', str(policy), *state]
+        start = [binary, 'daemon', 'start', *state]
         with ThreadPoolExecutor(max_workers=2) as executor:
             statuses = [future.result() for future in [executor.submit(invoke, start, nested) for _ in range(2)]]
         owned = True
@@ -175,14 +170,14 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
         assert first['epoch'] == second['epoch']
         wrong_state = invoke([binary, 'daemon', 'start', '--state', str(root / 'other-state')], nested, 8)
         assert wrong_state['code'] == 'WORKSPACE_STATE_MISMATCH'
-        assert mcp_status(mcp + ['--client-profile', 'running'], nested)['epoch'] == first['epoch']
+        assert mcp_status(mcp, nested)['epoch'] == first['epoch']
         process_id = json.loads((runtime / 'host-control.json').read_text())['processID']
         os.kill(process_id, signal.SIGTERM)
         deadline = time.monotonic() + 8
         while (runtime / 'host-control.json').exists():
             assert time.monotonic() < deadline, 'The owned daemon did not shut down'
             time.sleep(0.05)
-        recovered = mcp_status(mcp + ['--client-profile', 'automatic'], nested)
+        recovered = mcp_status(mcp, nested)
         assert index_socket.exists()
         assert recovered['epoch'] != first['epoch']
         assert recovered['workspaceID'] == identity['workspaceID']
@@ -196,4 +191,4 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
         result = subprocess.run([explorer, 'stop', '--workspace', str(workspace)], env=environment,
                                 capture_output=True, text=True, timeout=8)
         assert result.returncode == 0 or 'CONNECTION_FAILED' in result.stderr, result.stderr
-print('Bundled browser and assets, authenticated index, workspace selection, concurrent start, MCP recovery, and explicit stop verified.')
+print('Bundled browser and assets, authenticated index, workspace selection, cold MCP start, concurrent start, MCP recovery, and explicit stop verified.')

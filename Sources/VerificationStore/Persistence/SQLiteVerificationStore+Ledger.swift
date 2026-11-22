@@ -25,12 +25,10 @@ extension SQLiteVerificationStore {
     public func activateEpoch(_ epoch: String,engineIdentity: String) throws {
         try ensureAccepting()
         try safeID(epoch); try safeID(engineIdentity)
-        let bytes = try Canonical.encode(["engineIdentity":engineIdentity])
         try transaction(usingFailureReserve: true) {
-            try database.insert("metadata",id: "engine-identity",bytes: bytes)
             let head = try database.head("epoch",id: "active")
             let revision = head?.revision ?? 0
-            let value = try Canonical.encode(["epoch":epoch])
+            let value = try Canonical.encode(["epoch":epoch,"engineIdentity":engineIdentity])
             try database.insert("epoch",id: epoch,bytes: value)
             try database.advance("epoch",id: "active",expectedRevision: revision,recordID: epoch)
             if let head, head.recordID != epoch { try database.removeRecord("epoch",id: head.recordID) }
@@ -48,13 +46,6 @@ extension SQLiteVerificationStore {
         try ensureAccepting()
         guard envelope.watchID == nil else { throw InvarError("POLICY_DENIED","Watch envelopes require the retained watch issuer",exitCode: 8) }
         try validateEnvelopeLifetime(envelope,now: now)
-        if let current = try loadPolicy() {
-            guard current.workspaceID == envelope.workspaceID, current.revision == envelope.policyRevision,
-                let id = envelope.sessionID, let bytes = try database.load("session",id: id) else { throw InvarError("POLICY_DENIED","Request lacks current authenticated session authority",exitCode: 8) }
-            let session = try JSONDecoder().decode(AgentSession.self,from: bytes)
-            guard session.id == id, session.principal == envelope.principal, session.policyRevision == current.revision, session.expiresAt > now,
-                Set(envelope.capabilities.map(\.rawValue)).isSubset(of: Set(session.grants)) else { throw InvarError("POLICY_DENIED","Fixed request scope exceeds its authenticated session",exitCode: 8) }
-        }
         return try insertEnvelope(envelope,now: now)
     }
     func validateEnvelopeLifetime(_ envelope: RequestEnvelope,now: Double) throws {
@@ -70,12 +61,11 @@ extension SQLiteVerificationStore {
             if let existing = try database.head("envelope",id: key), let bytes = try database.load("envelope",id: existing.recordID) {
                 let recorded = try JSONDecoder().decode(RequestEnvelope.self,from: bytes)
                 guard recorded.fingerprint == envelope.fingerprint, recorded.operation == envelope.operation, recorded.watchID == envelope.watchID else { throw InvarError("IDEMPOTENCY_CONFLICT","Request key has a different typed fingerprint") }
-                guard recorded.expiresAt > now, recorded.daemonEpoch == activeEpoch, recorded.policyRevision == envelope.policyRevision else { throw InvarError("REQUEST_EXPIRED","Original request authority/deadline cannot be renewed") }
+                guard recorded.expiresAt > now, recorded.daemonEpoch == activeEpoch else { throw InvarError("REQUEST_EXPIRED","Original request deadline cannot be renewed") }
                 return recorded
             }
             let bytes = try Canonical.encode(envelope)
             try database.insert("envelope",id: envelope.id,bytes: bytes)
-            if let id = envelope.sessionID { try database.link(ownerKind: "envelope",ownerID: envelope.id,targetKind: "session",targetID: id) }
             try database.advance("envelope",id: key,expectedRevision: 0,recordID: envelope.id)
             return envelope
         }
@@ -85,7 +75,6 @@ extension SQLiteVerificationStore {
         return try transaction {
             let supplied = try Canonical.encode(envelope)
             guard try database.load("envelope",id: envelope.id) == supplied, envelope.daemonEpoch == activeEpoch, envelope.expiresAt > now else { throw InvarError("REQUEST_EXPIRED","Missing, changed, expired or old-epoch request envelope") }
-            if let policy = try loadPolicy() { guard policy.workspaceID == envelope.workspaceID, policy.revision == envelope.policyRevision else { throw InvarError("POLICY_DENIED","Request authority was revoked before acceptance",exitCode: 8) } }
             if envelope.watchID != nil {
                 try validateWatchRequest(envelope,operation: demand.request,now: now)
                 guard demand.id == Canonical.parts("invar.operation/2",[envelope.id]) else { throw InvarError("REQUEST_MISMATCH","Watch child differs from deterministic accepted operation") }
@@ -96,7 +85,7 @@ extension SQLiteVerificationStore {
                 guard receipt.fingerprint == envelope.fingerprint, receipt.operationID == demand.id else { throw InvarError("IDEMPOTENCY_CONFLICT","Accepted request identifies a different operation") }
                 return receipt
             }
-            guard demand.envelopeID == envelope.id, demand.principal == envelope.principal, demand.origin == (envelope.watchID == nil ? "internal" : "watch"), demand.operation == envelope.operation else { throw InvarError("POLICY_DENIED","Demand does not match authenticated request") }
+            guard demand.envelopeID == envelope.id, demand.principal == envelope.principal, demand.origin == (envelope.watchID == nil ? "internal" : "watch"), demand.operation == envelope.operation else { throw InvarError("POLICY_DENIED","Demand does not match sealed request") }
             let receipt = OperationReceipt(id: envelope.id,operationID: demand.id,fingerprint: envelope.fingerprint,acceptedAt: now,daemonEpoch: envelope.daemonEpoch)
             try insertNewDemand(demand)
             let bytes = try Canonical.encode(receipt)
@@ -116,7 +105,6 @@ extension SQLiteVerificationStore {
                 receipt.daemonEpoch == activeEpoch, envelope.daemonEpoch == activeEpoch, envelope == base.envelope,
                 receipt.fingerprint == envelope.fingerprint, demand.envelopeID == envelope.id, demand.principal == envelope.principal,
                 demand.request == base.operation, envelope.expiresAt > Date().timeIntervalSince1970 else { throw InvarError("POLICY_DENIED","External receipt/authority mapping differs or expired") }
-            if let policy = try loadPolicy() { guard policy.revision == envelope.policyRevision else { throw InvarError("POLICY_DENIED","Provider authority was revoked") } }
             guard try loadReceipt(receipt.id) == nil else { throw InvarError("IDEMPOTENCY_CONFLICT","External receipt is already mapped") }
             try insertNewDemand(demand)
             let bytes = try Canonical.encode(receipt)

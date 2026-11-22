@@ -14,7 +14,6 @@ public actor WorkspaceDaemon: VerificationDaemonServing, DaemonHostControlling {
     private var ownership: DaemonOwnership?
     private var store: SQLiteVerificationStore?
     private var state: DaemonState?
-    private var authentication: DaemonSessionAuthority?
     private var formalReaders: FormalReaderRegistry?
     private var coordinator: WorkspaceCoordinator?
     private var services: (any DaemonWorkspaceServices)?
@@ -37,39 +36,24 @@ public actor WorkspaceDaemon: VerificationDaemonServing, DaemonHostControlling {
         do {
             let files = DaemonPrivateFiles(paths: configuration.paths)
             if !configuration.explicitStart, FileManager.default.fileExists(atPath: configuration.paths.stopLatch.path) { throw InvarError("USER_STOPPED","Explicit user stop prevents automatic activation",exitCode: 6) }
-            if !configuration.explicitStart,
-                !FileManager.default.fileExists(atPath: configuration.paths.stateDirectory.appendingPathComponent("verification.sqlite").path) {
-                throw InvarError("APPROVAL_REQUIRED", "Start Invar and configure the workspace policy before automatic activation", exitCode: 8)
-            }
             let store = try SQLiteVerificationStore(root: configuration.paths.stateDirectory,policy: configuration.storePolicy)
             self.store = store
             try files.prepare(explicitStart: configuration.explicitStart)
             let engine = try ExecutionIdentity.current(executable: configuration.executable), epoch = UUID().uuidString
             self.epoch = epoch; engineIdentity = engine
-            var policy = try await store.loadPolicy()
-            if !configuration.explicitStart {
-                guard let policy else { throw InvarError("APPROVAL_REQUIRED", "Automatic activation requires a stored workspace policy", exitCode: 8) }
-                guard policy.engineIdentity == engine else { throw InvarError("EXECUTOR_MISMATCH", "The stored policy belongs to another Invar engine", exitCode: 8) }
-            }
             try await store.activateEpoch(epoch,engineIdentity: engine)
-            if let initial = configuration.initialPolicy {
-                guard initial.engineIdentity == engine else { throw InvarError("EXECUTOR_MISMATCH","Initial host policy names another engine") }
-                if let policy { guard initial == policy else { throw InvarError("REVISION_CONFLICT","Use host.policy.apply to change an existing policy") } }
-                else { try await store.savePolicy(initial,expectedRevision: 0); policy = initial }
-            }
-            let state = DaemonState(workspaceID: configuration.paths.workspaceID,epoch: epoch,engineIdentity: engine,policyRevision: policy?.revision ?? 0)
+            let state = DaemonState(workspaceID: configuration.paths.workspaceID,epoch: epoch,engineIdentity: engine)
             self.state = state; try await state.transition(to: .recovering)
             let resources = ResourcePool(policy: configuration.schedulingPolicy)
             let services = try await servicesBuilder.make(configuration: configuration,repository: store,epoch: epoch,engineIdentity: engine,resources: resources)
             self.services = services
-            let authentication = DaemonSessionAuthority(repository: store,epoch: epoch); self.authentication = authentication
             let scheduler = VerificationScheduler(backend: backend ?? IsolatedBackendExecutor(executable: configuration.executable),repository: store,applicability: services,policy: configuration.schedulingPolicy,resources: resources)
-            let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,authorization: authentication,operations: services,epoch: epoch,maximumDemands: configuration.maximumDemands,acceptingRequests: false,publisher: services as? any VerificationPublishing,external: services as? any ExternalAdmissionAuthorizing)
+            let coordinator = WorkspaceCoordinator(repository: store,scheduler: scheduler,operations: services,epoch: epoch,maximumDemands: configuration.maximumDemands,acceptingRequests: false,publisher: services as? any VerificationPublishing,external: services as? any ExternalAdmissionAuthorizing)
             self.coordinator = coordinator
-            if let managed = services as? any DaemonManagedServices { try await managed.bind(coordinator: coordinator,authentication: authentication) }
+            if let managed = services as? any DaemonManagedServices { try await managed.bind(coordinator: coordinator) }
             let formal = try FormalReaderRegistry(repository: store,workspaceID: configuration.paths.workspaceID,epoch: epoch,policy: configuration.formalReadPolicy)
             formalReaders = formal
-            let application = DaemonRequestDispatcher(workspaceID: configuration.paths.workspaceID,epoch: epoch,retentionSeconds: configuration.storePolicy.retentionSeconds,repository: store,coordinator: coordinator,authentication: authentication,state: state,formal: formal)
+            let application = DaemonRequestDispatcher(workspaceID: configuration.paths.workspaceID,epoch: epoch,retentionSeconds: configuration.storePolicy.retentionSeconds,repository: store,coordinator: coordinator,state: state,formal: formal)
             let peer = try ConnectionPeer.current()
             var birth = proc_bsdinfo()
             guard proc_pidinfo(getpid(),PROC_PIDTBSDINFO,0,&birth,Int32(MemoryLayout<proc_bsdinfo>.size)) == MemoryLayout<proc_bsdinfo>.size else { throw InvarError("OWNERSHIP_FAILED","Cannot establish host process start identity") }
@@ -80,7 +64,7 @@ public actor WorkspaceDaemon: VerificationDaemonServing, DaemonHostControlling {
             guard auditStatus == KERN_SUCCESS, count == 8 else { throw InvarError("OWNERSHIP_FAILED","Cannot establish kernel host audit identity") }
             let auditIdentity = audit.withUnsafeBytes { Data($0).base64EncodedString() }
             let endpoint = LocalDaemonEndpoint(workspaceID: configuration.paths.workspaceID,socketPath: configuration.paths.controlSocket.path,dataSocketPath: configuration.paths.dataSocket.path,serverBinaryDigest: peer.binaryDigest,serverCodeIdentity: peer.codeIdentity,engineIdentity: engine)
-            let record = DaemonHostRecord(stateDirectory: configuration.paths.stateDirectory.path,epoch: epoch,endpoint: endpoint,auditIdentity: auditIdentity,processID: getpid(),startSeconds: birth.pbi_start_tvsec,startMicroseconds: birth.pbi_start_tvusec,administrativeCredential: UUID().uuidString + UUID().uuidString)
+            let record = DaemonHostRecord(stateDirectory: configuration.paths.stateDirectory.path,epoch: epoch,endpoint: endpoint,auditIdentity: auditIdentity,processID: getpid(),startSeconds: birth.pbi_start_tvsec,startMicroseconds: birth.pbi_start_tvusec)
             let handler = DaemonHostDispatcher(record: record,host: self,application: application)
             let control = try DaemonRPCServer(socket: configuration.paths.controlSocket,channel: .control,maximumConnections: configuration.controlConnections,handler: handler); self.control = control
             let data = try DaemonRPCServer(socket: configuration.paths.dataSocket,channel: .data,maximumConnections: configuration.dataConnections,handler: handler); self.data = data
@@ -178,9 +162,8 @@ public actor WorkspaceDaemon: VerificationDaemonServing, DaemonHostControlling {
         }
     }
     private func refreshPhase() async throws {
-        guard recovered, stop == nil, let state, let store else { return }
-        let policy = try await store.loadPolicy()
-        let phase: DaemonState.Phase = policy == nil || sourceReadiness.readiness == .approvalRequired ? .approvalRequired : sourceReadiness.readiness == .ready ? .ready : .sourceOffline
+        guard recovered, stop == nil, let state else { return }
+        let phase: DaemonState.Phase = sourceReadiness.readiness == .approvalRequired ? .approvalRequired : sourceReadiness.readiness == .ready ? .ready : .sourceOffline
         try await state.transition(to: phase,diagnostics: sourceReadiness.diagnostics)
     }
     func administrativeStatus() async throws -> DaemonStatus {
@@ -204,20 +187,12 @@ public actor WorkspaceDaemon: VerificationDaemonServing, DaemonHostControlling {
     private func drainStopResponses() async throws {
         while !stopResponses.isEmpty { try Task.checkCancellation(); try await Task.sleep(for: .milliseconds(2)) }
     }
-    func installPolicy(_ policy: WorkspacePolicy,expectedRevision: Int) async throws -> DaemonStatus {
-        guard stop == nil, let store, let configuration, let engineIdentity, policy.workspaceID == configuration.paths.workspaceID, policy.engineIdentity == engineIdentity,
-            configuration.controlConnections + configuration.dataConnections <= policy.maximumConnections else { throw InvarError("POLICY_DENIED","Policy differs from this live host or admission is stopped",exitCode: 8) }
-        try await store.savePolicy(policy,expectedRevision: expectedRevision)
-        await authentication?.invalidate(); try await state?.policyChanged(revision: policy.revision)
-        try await refreshPhase()
-        return try await administrativeStatus()
-    }
     private func finish() async throws {
         if let state { try await state.transition(to: .draining) }
         do {
             await coordinator?.closeAdmission(); await services?.closeAdmission()
             try await control?.shutdown(); try await data?.shutdown()
-            try await coordinator?.shutdown(); try await services?.shutdown(); await authentication?.shutdown()
+            try await coordinator?.shutdown(); try await services?.shutdown()
             try await formalReaders?.shutdown()
             try await store?.shutdown(); store = nil
             if let configuration, let epoch { try DaemonPrivateFiles(paths: configuration.paths).removeRecord(epoch: epoch) }

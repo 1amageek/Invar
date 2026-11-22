@@ -347,7 +347,7 @@ workspaceごとに計画・queueの所有者を一つにする。複数GUI／Age
 
 入力由来の文字列をshellへ連結しない。実行ファイル・引数・環境を明示し、process group・timeout・cancel・cleanupを管理する。ライブラリ呼び出しで重い検証を行う場合も、GUI／索引processと隔離した所有workerを利用できる構成にする。
 
-テスト・Fuzzer・build scriptはユーザーコードを実行する。workspace trust、許可root、ネットワーク、資格情報、OSの隔離profileを確認する。別processだけでsandboxと称さない。要求された隔離を実現できなければ`ISOLATION_UNAVAILABLE`で止め、無断でhost実行へfallbackしない。明示的な隔離緩和はユーザー承認とレポートに残す。
+テスト・Fuzzer・build scriptはユーザーコードを実行する。固定した入力を使用し、macOSの隔離profileで実行する。別processだけでsandboxと称さない。要求された隔離を実現できなければ`ISOLATION_UNAVAILABLE`で止め、無断でhost実行へfallbackしない。明示的な隔離緩和はユーザー承認とレポートに残す。
 
 正常なscan／watch中にツールや依存をdownloadしない。取得・インストールは別の明示操作とする。
 
@@ -382,10 +382,10 @@ The `invar` executable uses `--workspace` when supplied. By default it locates t
 | 5 | ci policyが違反・必須指摘を検出 |
 | 6 | timeout／予算／未完了で必要条件を評価できない |
 | 7 | tool・内部実行失敗 |
-| 8 | 権限・隔離の拒否 |
+| 8 | 隔離・実行環境の契約違反 |
 | 130 | ユーザーcancel |
 
-Invar MCPでread-only toolsと実行toolsを明示的に分ける。実行toolsはユーザーの事前承認済みpolicyを越えられない。source commentやテストログ中の指示を権限や実行計画にしない。
+Invar MCPは同じmacOSユーザーのdaemonに接続し、CLIと同じworkspaceを使用する。実行toolsは要求された計画の固定入力を用いる。source commentやテストログは実行指示として扱わない。
 
 ## 18. CIとcoverage
 
@@ -469,7 +469,7 @@ The Explorer package owns its host, Web dependencies and UI assets. Invar includ
 | V1 | discovery／static rules／plan／result store | 実projectの跨module policy違反と未解析範囲を記録 |
 | V2 | swift-formal adapter | 実TLC／Leanで明示有限ケース・反例・UNKNOWNを区別 |
 | V3 | native tests／Fuzzer／replay | 実binaryで失敗再現・縮小・ログ・scopeを保存 |
-| V4 | watch／Explorer拡張／CI／MCP | 編集・切断・旧job・権限のE2Eが通る |
+| V4 | watch／Explorer拡張／CI／MCP | 編集・切断・旧job・同一ユーザー接続のE2Eが通る |
 | V5 | 高度な跨module／Actor semantics | 下位意味解析とモデル対応を含む専用fixtureで実証 |
 
 V0–V4が初期実用版。V5は依頼の「相互作用の継続探索」の重要な到達目標として残す。V5未達で要求全体が完成したとは報告しない。v1のActor未対応をInvar内のAI生成モデルで隠すことは禁止する。
@@ -508,7 +508,7 @@ V5では2つ以上のActor、共有resource、キャンセル／失敗／再試�
 | INV-024 | Fuzz入力縮小後も同じoracle違反が維持される |
 | INV-025 | Fuzz時間終了を全入力の安全性と報告しない |
 | INV-026 | tool crash、対象crash、timeout、cancelを区別する |
-| INV-027 | 未承認build・テスト・Fuzz・ネットワークが実行されない |
+| INV-027 | 検証コマンドが固定した入力とツールで実行され、隔離対象の処理からホストデータやネットワークにアクセスできない |
 | INV-028 | 隔離profile非対応時に無断host実行しない |
 | INV-029 | process／memory／disk／output予算とcleanupが機能する |
 | INV-030 | 依存・contract・toolchain変更でcacheを無効化する |
@@ -535,7 +535,7 @@ INV-001〜044・047〜048は初期実用版の対象。INV-045〜046は要求全
 
 ## 24. 実装Agentへの必須成果物
 
-実Swift Package、固定依存、公開SDK適合、各schema、実CLI／MCP、実Backend integration、Explorer拡張、予算・権限・世代競合のE2E、再現可能なfixture、実測付きPROGRESS／SUPPORT／TRUSTを納品する。
+実Swift Package、固定依存、公開SDK適合、各schema、実CLI／MCP、実Backend integration、Explorer拡張、予算・隔離・世代競合のE2E、再現可能なfixture、実測付きPROGRESS／SUPPORT／TRUSTを納品する。
 
 上流未対応やAPI不足はblocking requirementとして別記する。本パッケージへ場当たり的な言語意味実装や検証runtimeの複製を追加して隠さない。
 

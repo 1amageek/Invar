@@ -12,7 +12,7 @@ Bind a private Invar evidence record to bounded FormalEvidence reads without dup
 | [Invar](../../DESIGN.md) | parent | Public SDK boundaries | Data-only bridge | Core remains independent of Formal |
 | [FormalEvidence](https://github.com/1amageek/swift-formal/blob/main/Sources/FormalEvidence/DESIGN.md) | depends on | Read models/protocols | Formal meaning owner | Preserve exact values and independent axes |
 | [Client Formal](../VerificationClient/Formal/DESIGN.md) | used by | Typed remote query | Client reader implementation | No local file fallback |
-| [Daemon FormalQueries](../VerificationDaemon/FormalQueries/DESIGN.md) | used by | Lease/authenticated query | Server reader owner | Private pages need sourceValues |
+| [Daemon FormalQueries](../VerificationDaemon/FormalQueries/DESIGN.md) | used by | Lease and local query | Server reader owner | Exact bundle and bounded pages |
 
 ## Architecture
 ```text

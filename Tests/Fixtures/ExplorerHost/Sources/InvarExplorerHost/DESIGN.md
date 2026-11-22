@@ -19,7 +19,7 @@ request/query -> actual LocalVerificationClient
 ```
 
 ## Contracts and Invariants
-Commands return actual SDK values. Ordinary client reconnection uses a private principal resume credential, never a descriptive label as authority. Host read/mutation calls execute from the actual pinned host binary.
+Commands return actual SDK values. Ordinary client invocations connect through the same user’s private workspace socket. Host read/mutation calls execute from the actual pinned host binary.
 
 ## State, Ownership, and Lifecycle
 Serve owns Store/daemon shutdown. Client commands close their local observations. The driver owns process termination and temporary filesystem cleanup.

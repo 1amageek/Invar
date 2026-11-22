@@ -7,28 +7,24 @@ import VerificationStore
 @Suite(.timeLimit(.minutes(1))) struct WatchLifecycleTests {
     actor Preparation: WorkspaceOperationExecuting {
         private(set) var running = false
-        func execute(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
+        func execute(_ demand: RunDemand) async throws -> String {
             running = true; defer { running = false }
             try await Task.sleep(for: .seconds(30))
             throw InvarError("TEST_DEADLINE","Fixture preparation must be cancelled")
         }
     }
-    func authority(_ value: WatchRecordTests.Fixture) -> OperationAuthority {
-        OperationAuthority(principal: value.grant.session.principal,policyRevision: value.grant.session.policyRevision,capabilities: Set(value.grant.session.grants.compactMap(WorkspaceCapability.init(rawValue:))))
-    }
-    @Test func stagedRegistrationAndExplicitStopStayWithinOriginalPrincipal() async throws {
+    @Test func stagedRegistrationAndExplicitStopPreserveWatchLifecycle() async throws {
         let value = try await WatchRecordTests().fixture()
         let scheduler = VerificationScheduler(backend: SchedulerTests.ResourceFailure(),repository: value.store)
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: DurableCoordinatorTests.Operations(),epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: value.epoch,maximumDemands: 8)
         let lifecycle = WatchLifecycle(repository: value.store,coordinator: coordinator)
         defer {
-            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let parent = try await value.store.loadDemand(value.record.id)
-        let id = try await lifecycle.prepareRegistration(parent,authority: authority(value))
+        let id = try await lifecycle.prepareRegistration(parent)
         #expect(try await value.store.loadWatch(id).state == "registering")
         try await value.store.completeDemand(parent.transitioning(to: "completed",resultID: id),run: nil,view: nil,expectedRevision: parent.revision)
-        await #expect(throws: InvarError.self) { try await lifecycle.beginStop(id,principal: "another-principal") }
         #expect(try await value.store.loadWatch(id).state == "active")
         await #expect(throws: InvarError.self) { try await lifecycle.beginStop(id,principal: parent.principal,target: "expired") }
         #expect(try await value.store.loadWatch(id).state == "active")
@@ -39,13 +35,13 @@ import VerificationStore
     @Test func stopFindsAcceptedChildBeforePendingPointerAndAwaitsItsActualTaskCleanup() async throws {
         let value = try await WatchRecordTests().fixture()
         let scheduler = VerificationScheduler(backend: SchedulerTests.ResourceFailure(),repository: value.store), preparation = Preparation()
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: preparation,epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: preparation,epoch: value.epoch,maximumDemands: 8)
         let lifecycle = WatchLifecycle(repository: value.store,coordinator: coordinator)
         defer {
-            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let parent = try await value.store.loadDemand(value.record.id)
-        let id = try await lifecycle.prepareRegistration(parent,authority: authority(value))
+        let id = try await lifecycle.prepareRegistration(parent)
         try await value.store.completeDemand(parent.transitioning(to: "completed",resultID: id),run: nil,view: nil,expectedRevision: parent.revision)
         let active = try await value.store.loadWatch(id), cycle = active.revising(state: "active",cycle: WatchCycle(generation: 1,phase: "preparing"))
         try await value.store.saveWatch(cycle,expectedRevision: active.revision)

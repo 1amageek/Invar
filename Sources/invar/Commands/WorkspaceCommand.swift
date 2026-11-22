@@ -36,7 +36,7 @@ struct WorkspaceCommand {
         catch let error as InvarError where error.code == "DAEMON_UNAVAILABLE" {}
         catch let error as ArchitectureError where error.code == "CONNECTION_FAILED" {}
         let engine = try ExecutionIdentity.current(executable: configuration.executable)
-        _ = try await DaemonLauncher().start(configuration: configuration,engineIdentity: engine,policyPath: nil)
+        _ = try await DaemonLauncher().start(configuration: configuration,engineIdentity: engine)
         if try await ExplorerHost.isIndexRunning(in: options.workspace) == false {
             try await ExplorerHost.locate(workspace: options.workspace).ensureIndex()
         }

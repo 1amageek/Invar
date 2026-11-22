@@ -8,7 +8,7 @@ public struct NativeBuildService: NativeBuildPreparing {
     public init(runner: any ToolExecuting = LocalToolRunner()) { self.runner = runner }
     public func prepare(_ context: BackendContext) async throws -> NativeBuildArtifact {
         let meter = try NativeResourceMeter()
-        guard context.nativeExecutionAllowed, context.job.approved, let profile = context.job.native?.profile ?? context.job.fuzz?.profile else { throw InvarError("POLICY_DENIED", "Native build lacks its host grant/profile", exitCode: 8) }
+        guard let profile = context.job.native?.profile ?? context.job.fuzz?.profile else { throw InvarError("POLICY_DENIED", "Native build lacks its profile", exitCode: 8) }
         guard let expected = context.job.toolchainIdentity else { throw InvarError("BLOCKED_NATIVE_TOOLCHAIN", "Native toolchain was unavailable at planning", exitCode: 3) }
         let identity = try NativeToolchain.identity(profile)
         guard identity == expected else { throw InvarError("TOOLCHAIN_MISMATCH", "Native build environment differs") }

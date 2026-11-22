@@ -52,17 +52,13 @@ import VerificationStore
         initialized = true
         return Fixture(workspaceID: workspaceID,root: root,store: store,evidence: evidence,reference: reference,document: document)
     }
-    func session(id: String = "session",principal: String = "principal",seconds: Double = 60,privateReads: Bool = true) -> AgentSession {
-        AgentSession(id: id,principal: principal,agentLabel: nil,grants: privateReads ? ["read","sourceValues"] : ["read"],policyRevision: 1,expiresAt: Date().timeIntervalSince1970+seconds)
-    }
     struct Client: FormalEvidenceQuerying {
         let registry: FormalReaderRegistry
-        let session: AgentSession
-        func formalQuery(_ query: FormalReadQuery) async throws -> FormalReadResult { try await registry.query(query,session: session,epoch: "epoch") }
+        func formalQuery(_ query: FormalReadQuery) async throws -> FormalReadResult { try await registry.query(query,epoch: "epoch") }
     }
     @Test func originalTypedPagesValuesOriginsAndLoopOrderRoundTripAndCloseReleasesPins() async throws {
         let value = try await fixture(), registry = try FormalReaderRegistry(repository: value.store,workspaceID: value.workspaceID,epoch: "epoch")
-        let client = Client(registry: registry,session: session())
+        let client = Client(registry: registry)
         let reader = try await RemoteFormalEvidenceStore(client: client,evidenceID: value.evidence.id).open(value.reference,budget: FormalReadPolicy.development.maximumBudget)
         let catalog = try await reader.catalog()
         #expect(catalog.graphs.first?.id == Self.rid("states"))
@@ -84,29 +80,26 @@ import VerificationStore
         await #expect(throws: InvarError.self) { try await reader.catalog() }
         try await registry.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root)
     }
-    @Test func readLeaseRejectsForeignSessionsWrongBundleAndUnprivilegedReads() async throws {
+    @Test func readLeaseRejectsWrongEpochAndBundle() async throws {
         let value = try await fixture(), registry = try FormalReaderRegistry(repository: value.store,workspaceID: value.workspaceID,epoch: "epoch")
-        let grant = session()
-        let result = try await registry.query(.open(evidenceID: value.evidence.id,reference: value.reference,budget: FormalReadPolicy.development.maximumBudget),session: grant,epoch: "epoch")
+        let result = try await registry.query(.open(evidenceID: value.evidence.id,reference: value.reference,budget: FormalReadPolicy.development.maximumBudget),epoch: "epoch")
         guard case .opened(let lease) = result else { throw InvarError("TEST_BINDING","No lease") }
-        for other in [session(id: "other-session"),session(principal: "other-principal"),session(privateReads: false)] {
-            await #expect(throws: InvarError.self) { try await registry.query(.catalog(handle: lease.id),session: other,epoch: "epoch") }
-            await #expect(throws: InvarError.self) { try await registry.query(.close(handle: lease.id),session: other,epoch: "epoch") }
-        }
+        await #expect(throws: InvarError.self) { try await registry.query(.catalog(handle: lease.id),epoch: "other-epoch") }
+        await #expect(throws: InvarError.self) { try await registry.query(.close(handle: lease.id),epoch: "other-epoch") }
         let forged = EvidenceBundleReference(id: value.reference.id,sha256: value.reference.sha256,byteCount: value.reference.byteCount+1)
-        await #expect(throws: InvarError.self) { try await registry.query(.open(evidenceID: value.evidence.id,reference: forged,budget: FormalReadPolicy.development.maximumBudget),session: grant,epoch: "epoch") }
+        await #expect(throws: InvarError.self) { try await registry.query(.open(evidenceID: value.evidence.id,reference: forged,budget: FormalReadPolicy.development.maximumBudget),epoch: "epoch") }
         #expect(await registry.activeCount == 1)
-        _ = try await registry.query(.close(handle: lease.id),session: grant,epoch: "epoch")
+        _ = try await registry.query(.close(handle: lease.id),epoch: "epoch")
         try await registry.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root)
     }
     @Test func capacityAndExpiryAreBoundedAndExpiredReadersReleaseTheirPinClosure() async throws {
         let value = try await fixture()
         let policy = FormalReadPolicy(maximumReaders: 1,leaseSeconds: 1,maximumBudget: FormalReadPolicy.development.maximumBudget)
-        let registry = try FormalReaderRegistry(repository: value.store,workspaceID: value.workspaceID,epoch: "epoch",policy: policy), grant = session(seconds: 0.08)
+        let registry = try FormalReaderRegistry(repository: value.store,workspaceID: value.workspaceID,epoch: "epoch",policy: policy)
         let request = FormalReadQuery.open(evidenceID: value.evidence.id,reference: value.reference,budget: policy.maximumBudget)
-        _ = try await registry.query(request,session: grant,epoch: "epoch")
-        await #expect(throws: InvarError.self) { try await registry.query(request,session: grant,epoch: "epoch") }
-        try await Task.sleep(for: .milliseconds(100))
+        _ = try await registry.query(request,epoch: "epoch")
+        await #expect(throws: InvarError.self) { try await registry.query(request,epoch: "epoch") }
+        try await Task.sleep(for: .milliseconds(1100))
         try await registry.expire()
         #expect(await registry.activeCount == 0)
         _ = try await value.store.prune(now: Date().timeIntervalSince1970+3,maximumObjects: 100)

@@ -41,9 +41,9 @@ import VerificationStore
     func preflight(_ fixture: PublicationTests.Fixture,jobID: String,node: VerificationNode? = nil) async throws -> (ProviderActionRegistration,OperationReceipt) {
         let now = Date().timeIntervalSince1970, id = UUID().uuidString
         let operation = WorkspaceOperation.verify(planID: fixture.plan.id,changeRevisionID: nil,replayOfRunID: nil,node: node)
-        let envelope = RequestEnvelope(id: UUID().uuidString,sessionID: "real-session-fixture",capabilities: [.verification],requestKey: id,principal: "agent",workspaceID: fixture.plan.body.input.workspaceID,fingerprint: try Canonical.identity(operation),operation: operation.name,daemonEpoch: fixture.epoch,policyRevision: 1,expiresAt: now+60,retainUntil: now+120)
+        let envelope = RequestEnvelope(id: UUID().uuidString,requestKey: id,principal: "agent",workspaceID: fixture.plan.body.input.workspaceID,fingerprint: try Canonical.identity(operation),operation: operation.name,daemonEpoch: fixture.epoch,expiresAt: now+60,retainUntil: now+120)
         _ = try await fixture.store.issueEnvelope(envelope,now: now)
-        let base = ProviderActionRegistration(id: id,envelope: envelope,operation: operation,input: fixture.plan.body.input,sourceFingerprint: String(repeating: "1",count: 64),intent: Data(),authority: Data(),runRequestID: id,run: Data(),expiresAt: now+120)
+        let base = ProviderActionRegistration(id: id,envelope: envelope,operation: operation,input: fixture.plan.body.input,sourceFingerprint: String(repeating: "1",count: 64),intent: Data(),runRequestID: id,run: Data(),expiresAt: now+120)
         try await fixture.store.createProviderAction(base)
         try await fixture.store.saveProviderActionState(ProviderActionState(id: id).revising(state: "accepted",jobID: jobID),expectedRevision: 1)
         return (base,OperationReceipt(id: envelope.id,operationID: jobID,fingerprint: envelope.fingerprint,acceptedAt: now,daemonEpoch: fixture.epoch))
@@ -53,7 +53,7 @@ import VerificationStore
         let (base,receipt) = try await preflight(fixture,jobID: job)
         let starts = Starts(ExternalAdmission(actionID: base.id,receipt: receipt))
         let scheduler = VerificationScheduler(backend: StaticBackend(evaluator: ArchitectureRuleEvaluator()),repository: fixture.store,resources: fixture.resources)
-        let coordinator = WorkspaceCoordinator(repository: fixture.store,scheduler: scheduler,authorization: DurableCoordinatorTests.Authorization(),operations: DurableCoordinatorTests.Operations(),epoch: fixture.epoch,maximumDemands: 4,external: starts)
+        let coordinator = WorkspaceCoordinator(repository: fixture.store,scheduler: scheduler,operations: DurableCoordinatorTests.Operations(),epoch: fixture.epoch,maximumDemands: 4,external: starts)
         defer { do { try await coordinator.shutdown(); try await PublicationTests().cleanup(fixture) } catch { Issue.record(error) } }
         #expect(try await coordinator.submitExternal(actionID: base.id) == receipt)
         #expect(try await fixture.store.loadReceipt(base.envelope.id) == receipt)

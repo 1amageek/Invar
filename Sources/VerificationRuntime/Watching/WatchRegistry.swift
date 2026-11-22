@@ -37,13 +37,13 @@ public actor WatchRegistry: WorkspaceOperationExecuting {
         eventPump = Task { await self.observeSource() }
         cyclePump = Task { await self.admitCycles() }
     }
-    public func execute(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
-        guard !stopped, cleanupFailure == nil, demand.principal == authority.principal else { throw InvarError("COORDINATOR_STOPPED","Watch control is closed or requires recovery") }
+    public func execute(_ demand: RunDemand) async throws -> String {
+        guard !stopped, cleanupFailure == nil else { throw InvarError("COORDINATOR_STOPPED","Watch control is closed or requires recovery") }
         switch demand.request {
         case .watch:
             guard !closed else { throw InvarError("COORDINATOR_STOPPED","Watch registration admission is closed") }
-            return try await lifecycle.prepareRegistration(demand,authority: authority)
-        case .stopWatch(let id): return try await stop(id,principal: authority.principal)
+            return try await lifecycle.prepareRegistration(demand)
+        case .stopWatch(let id): return try await stop(id,principal: demand.principal)
         default: throw InvarError("INVALID_REQUEST","Non-watch operation reached watch registry")
         }
     }
@@ -61,10 +61,11 @@ public actor WatchRegistry: WorkspaceOperationExecuting {
             do {
                 let event = try await events.poll()
                 try Task.checkCancellation()
-                sourceReady = event.ready; sourceFailure = nil
                 if event.invalidated {
+                    sourceReady = false
                     try await invalidate(event.reason ?? "Source continuity requires resync")
                 }
+                sourceReady = event.ready; sourceFailure = nil
             } catch is CancellationError { return }
             catch {
                 sourceReady = false; sourceFailure = Self.failure(error)
@@ -100,10 +101,6 @@ public actor WatchRegistry: WorkspaceOperationExecuting {
             if watch.state == "stopping" { _ = try await stop(watch.id,principal: watch.principal); continue }
             if watch.expiresAt <= Date().timeIntervalSince1970 { _ = try await stop(watch.id,principal: watch.principal,target: "expired"); continue }
             guard watch.state == "active" else { continue }
-            do { try await repository.authorizeWatch(watch.id) }
-            catch let failure as InvarError where failure.code == "POLICY_DENIED" {
-                try await pause(watch,failure: failure); continue
-            }
             try Task.checkCancellation()
             guard !closed else { return }
             guard sourceReady, cycles[watch.id] == nil, cycles.count < policy.maximumConcurrentCycles else { continue }
@@ -130,13 +127,6 @@ public actor WatchRegistry: WorkspaceOperationExecuting {
     private func finished(_ id: String,succeeded: Bool) {
         cycles.removeValue(forKey: id)
         nextProbe[id] = ContinuousClock.now.advanced(by: .seconds(succeeded ? policy.probeSeconds : policy.retrySeconds))
-    }
-    private func pause(_ watch: WatchRecord,failure: InvarError) async throws {
-        let paused = try await repository.pauseWatch(watch.id,failure: Self.failure(failure))
-        guard paused.state == "paused" else { return }
-        let task = cycles[watch.id]; task?.cancel(); await task?.value
-        try await lifecycle.cancelChildren(paused)
-        _ = try await repository.finishWatchPause(watch.id)
     }
     public func closeAdmission() async {
         closed = true

@@ -1,6 +1,6 @@
 # Invar
 
-Invar coordinates formal verification for a software workspace. Codex, Claude Code, and the CLI submit work to a shared local daemon. Invar captures exact inputs, runs approved checks, retains evidence, and publishes results to the matching Architecture Explorer snapshot. The package also provides a Swift client SDK.
+Invar coordinates formal verification for a software workspace. Codex, Claude Code, and the CLI submit work to a shared local daemon. Invar captures exact inputs, runs requested checks, retains evidence, and publishes results to the matching Architecture Explorer snapshot. The package also provides a Swift client SDK.
 
 ## Verification workflow
 
@@ -29,7 +29,7 @@ The local Invar plugin bundles four skills and a stdio MCP server for Codex and 
 | `$formal-verification` | Run scoped **Implementation Model Verification**. Keep node-level preconditions and expected results in `Verification/<subject>/properties.json`. [Implementation Model Verification](plugins/invar/skills/formal-verification/SKILL.md) |
 | `$generate-architecture` | Inspect requirements, implementation, and configuration to build or update `ARCHITECTURE.dsl` for Explorer's C1 and C2 Map. [Generate Architecture](plugins/invar/skills/generate-architecture/SKILL.md) |
 
-Run the agent in the target workspace. For a snapshot-bound run, start with an indexed Explorer workspace, an authorized Invar connection, and the host-approved configuration for the target. For the Map's **Verify project** action, place `Verification/Project/invar.json` relative to the selected system or container's declaration directory. [Project action contract](plugins/invar/SPEC.md#project-verification-action)
+Run the agent in the target workspace. For a snapshot-bound run, start with an indexed Explorer workspace and the verification configuration for the target. For the Map's **Verify project** action, place `Verification/Project/invar.json` relative to the selected system or container's declaration directory. [Project action contract](plugins/invar/SPEC.md#project-verification-action)
 
 ![The agent plans a run with Invar, Explorer supplies the pinned inputs, the worker checks them, and Invar publishes and returns the report.](Documentation/Diagrams/agent-verification.svg)
 
@@ -64,7 +64,7 @@ invar status
 invar stop
 ```
 
-`invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. The plugin runs `invar mcp` in the agent's project directory. MCP shares an existing daemon or starts one for an already configured workspace. Explicit stop holds until the next explicit start.
+`invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. The plugin runs `invar mcp` in the agent's project directory. MCP shares the workspace daemon or starts it on first use. Explicit stop holds until the next explicit start.
 
 ## Install the agent plugin
 
@@ -84,12 +84,14 @@ For Claude Code, use its plugin commands.
 /plugin install invar@invar-local
 ```
 
-For snapshot-bound verification, start Invar with the policy reviewed for that workspace and authorize the Invar Provider in Explorer. The policy authorizes the exact configuration, executables, and capabilities. The workspace can open before verification approval. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
+CLI and MCP connect to the workspace daemon through the current macOS user’s private socket. Start Invar in the workspace and connect its Provider through Architecture Explorer for snapshot-bound capture and publication. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
 
 ```sh
-invar --workspace /path/to/target --policy /path/to/policy.json
+invar --workspace /path/to/target
 invar status --workspace /path/to/target
 ```
+
+When updating an existing workspace, remove the old `approved` fields from its verification configuration. Stop the running daemon with its current binary before upgrading. After upgrading, start Invar and prepare a fresh plan from the current snapshot. Existing evidence stays in the local store.
 
 For development, run `swift build --product invar` from the Invar checkout. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v invar)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/invar`.
 

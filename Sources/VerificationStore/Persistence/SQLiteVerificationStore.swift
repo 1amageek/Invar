@@ -43,7 +43,6 @@ public actor SQLiteVerificationStore: VerificationRepository {
     }
     public func saveInput(_ capture: CapturedWorkspace) async throws -> String {
         try ensureAccepting()
-        if let policy = try loadPolicy(), policy.workspaceID != capture.inventory.workspaceID { throw InvarError("INPUT_MISMATCH","Capture belongs to another host workspace") }
         inputWrites += 1; defer { finishInputWrite() }
         let manifest = try Canonical.encode(capture.inventory)
         guard manifest.count <= 64 * 1024 * 1024,
@@ -207,7 +206,6 @@ public actor SQLiteVerificationStore: VerificationRepository {
     public func savePlan(_ plan: VerificationPlan) throws {
         try ensureAccepting()
         try PlanValidation.validate(plan)
-        if let policy = try loadPolicy() { guard policy.workspaceID == plan.body.input.workspaceID, policy.engineIdentity == plan.body.executorIdentity else { throw InvarError("INPUT_MISMATCH","Plan differs from the host workspace/engine") } }
         _ = try inputRoot(plan.body.input.id)
         let inventory = try inventory(plan.body.input)
         try PlanValidation.bind(plan,to: inventory)

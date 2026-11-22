@@ -33,9 +33,9 @@ import VerificationStore
         try await store.savePlan(plan)
         return (store, plan, root)
     }
-    static func job(_ id: String, dependencies: [String] = [], approved: Bool = true, memory: Int = 64) -> VerificationJob {
-        VerificationJob(id: id, backend: "static", required: true, approved: approved, dependencies: dependencies,
-            policy: ArchitecturePolicy(id: id, kind: "cycle", approved: approved), memoryMiB: memory)
+    static func job(_ id: String, dependencies: [String] = [], memory: Int = 64) -> VerificationJob {
+        VerificationJob(id: id, backend: "static", required: true, dependencies: dependencies,
+            policy: ArchitecturePolicy(id: id, kind: "cycle"), memoryMiB: memory)
     }
     @Test(.timeLimit(.minutes(1))) func overlapsIndependentJobsAndOrdersDependencies() async throws {
         let (store, plan, root) = try await Self.setup(jobs: [Self.job("a"), Self.job("b"), Self.job("c", dependencies: ["a", "b"])])
@@ -49,12 +49,12 @@ import VerificationStore
         #expect(try await store.loadRun(result.id) == result)
         try await store.shutdown(); try FileManager.default.removeItem(at: root)
     }
-    @Test(.timeLimit(.minutes(1))) func admitsMemoryAndBlocksUnapprovedOrInfeasibleJobs() async throws {
-        let (store, plan, root) = try await Self.setup(jobs: [Self.job("a"), Self.job("b"), Self.job("blocked", approved: false), Self.job("large", memory: 128)], budget: RunBudget(memoryMiB: 64))
+    @Test(.timeLimit(.minutes(1))) func admitsMemoryAndBlocksInfeasibleJobs() async throws {
+        let (store, plan, root) = try await Self.setup(jobs: [Self.job("a"), Self.job("b"), Self.job("large", memory: 128)], budget: RunBudget(memoryMiB: 64))
         let probe = Probe()
         let result = try await VerificationScheduler(backend: probe, repository: store, applicability: Current(value: "matchesInputs")).run(plan.id)
         #expect(await probe.status().0 == 1)
-        #expect(result.attempts.filter { $0.execution == "blocked" }.count == 2)
+        #expect(result.attempts.filter { $0.execution == "blocked" }.count == 1)
         #expect(!result.accepted)
         try await store.shutdown(); try FileManager.default.removeItem(at: root)
     }

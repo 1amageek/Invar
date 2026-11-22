@@ -19,10 +19,10 @@ actor ExplorerDaemonServices: DaemonWorkspaceServices, DaemonManagedServices, Ve
         self.resources = resources; self.retentionSeconds = retentionSeconds
         self.repository = repository; self.workspaceID = workspaceID; self.epoch = epoch; self.watchPolicy = watchPolicy
     }
-    func bind(coordinator: any WorkspaceCoordinating,authentication: any DaemonAuthenticating) async throws {
+    func bind(coordinator: any WorkspaceCoordinating) async throws {
         guard watches == nil else { throw InvarError("INVALID_TRANSITION","Explorer services already own a watch registry") }
         guard let external = coordinator as? any ExternalWorkspaceCoordinating else { throw InvarError("UNSUPPORTED_CAPABILITY","Provider service requires an external admission coordinator") }
-        actions = ProviderActionRuntime(operations: operations,connection: connection,repository: repository,authentication: authentication,coordinator: external,resources: resources,epoch: epoch,retentionSeconds: retentionSeconds)
+        actions = ProviderActionRuntime(operations: operations,connection: connection,repository: repository,coordinator: external,resources: resources,epoch: epoch,retentionSeconds: retentionSeconds)
         watches = try WatchRegistry(repository: repository,coordinator: coordinator,events: ExplorerSourceEvents(connection: connection),probe: operations,workspaceID: workspaceID,epoch: epoch,policy: watchPolicy)
     }
     func activate() async throws {
@@ -46,12 +46,12 @@ actor ExplorerDaemonServices: DaemonWorkspaceServices, DaemonManagedServices, Ve
         switch status.state { case .ready: readiness = .ready; case .sourceOffline: readiness = .sourceOffline; case .approvalRequired: readiness = .approvalRequired }
         return DaemonSourceStatus(readiness,diagnostics: status.failure.map { [$0.code + ": " + $0.message] } ?? [])
     }
-    func execute(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
+    func execute(_ demand: RunDemand) async throws -> String {
         switch demand.request {
         case .watch,.stopWatch:
             guard let watches else { throw InvarError("INVALID_TRANSITION","Watch registry has not been bound") }
-            return try await watches.execute(demand,authority: authority)
-        default: return try await operations.execute(demand,authority: authority)
+            return try await watches.execute(demand)
+        default: return try await operations.execute(demand)
         }
     }
     func applicability(of plan: SchedulingPlan) async throws -> InputComparison { try await operations.applicability(of: plan) }

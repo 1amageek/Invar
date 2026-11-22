@@ -1,7 +1,6 @@
 import Foundation
 
 public protocol ChangeRepository: Sendable {
-    func saveAgentSession(_ session: AgentSession) async throws
     func createChange(_ value: ChangeRecord) async throws
     func openChanges(workspaceID: String) async throws -> [ChangeRecord]
     func loadChange(_ id: String) async throws -> ChangeRecord

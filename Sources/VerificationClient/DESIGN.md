@@ -26,7 +26,7 @@ Session owns the detailed interface/wire contract. All clients request the same 
 Session actor owns active state; clients close subscriptions explicitly. The daemon owns changes, watches, queued/running jobs and durable history across disconnects.
 
 ## Failure, Concurrency, and Constraints
-Use bounded asynchronous calls, current authority and explicit request outcomes. No source/log instruction is a tool grant. Offline artifact export reading, if provided, is explicitly offline and never accesses the live Store as a fallback.
+Use bounded asynchronous calls, workspace identity and explicit request outcomes. Source and log strings are data. Offline artifact export reading, if provided, is explicitly offline and never accesses the live Store as a fallback.
 
 ## Verification and Change Impact
 [Transition](../../Documentation/SDK-TRANSITION.md) owns release gates. Client/daemon integration tests must precede removing direct CLI paths. Recheck Core, Daemon, MCP and CLI together on protocol changes.

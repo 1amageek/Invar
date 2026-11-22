@@ -12,7 +12,6 @@ public actor NativeSessionExecutor: NativeSessionExecuting {
     private var peakResident = 0.0
     private var peakProcesses = 0.0
     public init(context: BackendContext) throws {
-        guard context.nativeExecutionAllowed else { throw InvarError("POLICY_DENIED", "Native execution requires a host grant", exitCode: 8) }
         self.context = context
         journal = try ToolLaunchJournal(directory: context.outputRoot.appendingPathComponent("native-processes"), artifactRoot: context.outputRoot.appendingPathComponent("native"))
         initialCoordinatorCPU = try Self.coordinatorCPU()

@@ -4,11 +4,11 @@ import VerificationCore
 extension SQLiteVerificationStore {
     public func createProviderAction(_ value: ProviderActionRegistration) throws {
         try ensureAccepting(); try safeID(value.id); try safeID(value.runRequestID)
-        guard value.intent.count <= 16384, value.authority.count <= 8192, value.run.count <= 16384,
+        guard value.intent.count <= 16384, value.run.count <= 16384,
             value.expiresAt.isFinite, value.expiresAt > Date().timeIntervalSince1970,
             value.envelope.workspaceID == value.input.workspaceID, value.sourceFingerprint.utf8.count == 64,
             value.envelope.fingerprint == (try Canonical.identity(value.operation)), value.envelope.operation == value.operation.name,
-            value.envelope.watchID == nil, value.envelope.sessionID != nil else { throw InvarError("INVALID_REQUEST","Provider preflight exceeds fixed identity/size/lifetime bounds") }
+            value.envelope.watchID == nil else { throw InvarError("INVALID_REQUEST","Provider preflight exceeds fixed identity/size/lifetime bounds") }
         switch value.operation {
         case .verify(let id,let change,let replay,let node):
             if let node { guard node.snapshotID == value.input.snapshotID, try inventory(value.input).entities.contains(where: { $0.id == node.entityID }) else { throw InvarError("INPUT_MISMATCH","External node differs from sealed input") } }

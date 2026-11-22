@@ -39,12 +39,12 @@ def create_native_fixture(w, root, listener, compiler, sdk, tools_directory):
 '''
     (w / 'Sandbox.swift').write_text(sandbox.replace('SECRET', json.dumps(str(secret))).replace('PORT', str(listener.getsockname()[1])))
     (w / 'corpus.json').write_text('["100"]')
-    checks = [{'id': 'native', 'profile': profile('Harness.swift'), 'approved': True},
-              {'id': 'isolation', 'profile': profile('Sandbox.swift'), 'approved': True, 'expectedTestCount': 5},
-              {'id': 'expected_trap', 'profile': profile('Trap.swift'), 'approved': True, 'expectedSignal': 5},
-              {'id': 'unexpected_crash', 'profile': profile('Trap.swift'), 'approved': True},
-              {'id': 'empty_oracle', 'profile': profile('Empty.swift'), 'approved': True}]
-    config = {'schemaVersion': 1, 'native': checks, 'fuzz': [{'id': 'fuzz', 'profile': profile('FuzzHarness.swift'), 'corpus': 'corpus.json', 'seed': '7', 'minimum': '0', 'maximum': '100', 'iterations': 5, 'approved': True}]}
+    checks = [{'id': 'native', 'profile': profile('Harness.swift')},
+              {'id': 'isolation', 'profile': profile('Sandbox.swift'), 'expectedTestCount': 5},
+              {'id': 'expected_trap', 'profile': profile('Trap.swift'), 'expectedSignal': 5},
+              {'id': 'unexpected_crash', 'profile': profile('Trap.swift')},
+              {'id': 'empty_oracle', 'profile': profile('Empty.swift')}]
+    config = {'schemaVersion': 1, 'native': checks, 'fuzz': [{'id': 'fuzz', 'profile': profile('FuzzHarness.swift'), 'corpus': 'corpus.json', 'seed': '7', 'minimum': '0', 'maximum': '100', 'iterations': 5}]}
     paths = ["Harness.swift", "Sandbox.swift", "Trap.swift", "Empty.swift", "FuzzHarness.swift", "corpus.json"]
     entries = []
     for path in sorted(paths):

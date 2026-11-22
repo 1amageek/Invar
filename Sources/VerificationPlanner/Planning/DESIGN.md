@@ -4,7 +4,7 @@
 Own immutable verified-input planning and capability matching. Parent: [module](../DESIGN.md). No children.
 
 ## Responsibilities and Boundaries
-Bind inventory, approved policy/oracle, tool identities, budget and backend mode. Never execute verification or silently replace unsupported inputs.
+Bind inventory, declared policy and oracle, tool identities, budget and backend mode. Never execute verification or silently replace unsupported inputs.
 
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |
@@ -18,7 +18,7 @@ Validated input -> Planning -> immutable result or typed failure
 ```
 
 ## Contracts and Invariants
-Implemented SDK revision. Plan preparation is a daemon-owned bounded operation, not CommandDriver work. It consumes sealed ChangeRevision/VerificationInput references and returns a persisted plan DAG with typed job/input/artifact references and exact capabilities/budgets. Plan does not execute user Lean/macros/build scripts; such operations require separate admitted execution capabilities.
+Implemented SDK revision. Plan preparation is a daemon-owned bounded operation, not CommandDriver work. It consumes sealed ChangeRevision/VerificationInput references and returns a persisted plan DAG with typed job/input/artifact references and exact resources and budgets. Plan does not execute user Lean/macros/build scripts; the backend owns execution.
 
 Preserve exact input identity, separate execution/property/domain/translation/applicability, and propagate typed failures. Public API is protocol-based; concrete state does not escape its owner.
 

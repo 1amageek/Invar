@@ -25,7 +25,7 @@ sealed change -> immutable plan/run/evidence associations
 ## Contracts and Invariants
 | Proposed record | Required semantics |
 |---|---|
-| `AgentSession` | daemon-issued id, authenticated client principal, optional Codex/Claude label, granted scope, policy revision and expiry; caller label alone is not identity |
+
 | `ChangeRecord` | workspace/id, Agent claim or unattributed origin, requested scope, fixed baseline reference, lifecycle revision and current sealed revision id |
 | `ChangeClaim` | claimed intent, declared paths/entities, optional patch digest and expected post-file digests; descriptive data, never an oracle/permission |
 | `ChangeRevision` | immutable id/parent, before/after captured input references, observed delta digest, attribution assessment, diagnostics and evidence associations; input mutation creates another revision |
@@ -34,7 +34,7 @@ sealed change -> immutable plan/run/evidence associations
 | `SubjectCorrespondence` | before/after subject references, producer, basis and precision; unknown/ambiguous is explicit; no display-name matching |
 | `AttributionAssessment` | claimed, claimMatched, overlapping, external or unknown; basis and overlapping change ids; none of these attests exclusive filesystem authorship |
 
-Baseline capture includes dirty/staged/untracked approved inputs and context; a Git commit alone is insufficient. Git metadata may be recorded as provenance, never substituted for captured bytes. The Agent waits for state `open` before editing. If an explicitly requested baseline is unavailable or changes during acquisition, opening fails; no newer baseline silently replaces it.
+Baseline capture includes dirty, staged and untracked captured inputs and context; a Git commit alone is insufficient. Git metadata may be recorded as provenance, never substituted for captured bytes. The Agent waits for state `open` before editing. If an explicitly requested baseline is unavailable or changes during acquisition, opening fails; no newer baseline silently replaces it.
 
 ```text
 opening -> open -> sealing -> sealed
@@ -53,4 +53,4 @@ Bound open changes, claim/hunk bytes, subjects and capture jobs by host policy. 
 ## Verification and Change Impact
 Planned `ChangeTrackingTests` **IC-01..05** cover dirty baselines, Unicode hunks, concurrent Agents/user edits, ambiguous rename/deletion, changed baselines and repeated/conflicting seal requests. Recheck Discovery, Runtime, Store and Client when attribution/identity semantics change.
 
-A ChangeRecord binds an immutable ownerPrincipal independently of its optional descriptive session. Sealing requires that principal; public origin/claim fields never authorize modifying another change. Concurrent open records remain visible to the change-analysis owner for conservative overlap observations.
+A ChangeRecord binds the originating request principal and baseline as provenance. A local workspace client can seal an open change in that workspace. Concurrent open records support conservative overlap observations.

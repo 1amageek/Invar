@@ -19,7 +19,7 @@ import VerificationStore
     }
     @Test func ruleWitnessAndAbsenceHaveDifferentCompletenessRequirements() throws {
         let edge = FactRecord(id: "ab", kind: "dependsOn", source: "a", target: "b", producer: "test", scope: "workspace")
-        let policy = ArchitecturePolicy(id: "no-ab", kind: "forbiddenDependency", from: EntitySelector(id: "a"), to: EntitySelector(id: "b"), approved: true)
+        let policy = ArchitecturePolicy(id: "no-ab", kind: "forbiddenDependency", from: EntitySelector(id: "a"), to: EntitySelector(id: "b"))
         let evaluator = ArchitectureRuleEvaluator()
         let violation = try evaluator.evaluate(policy, inventory: Self.inventory(facts: [edge], complete: false))
         #expect(violation.outcome == "violatedWithinScope")
@@ -29,7 +29,7 @@ import VerificationStore
         #expect(try evaluator.evaluate(policy, inventory: Self.inventory()).outcome == "holdsWithinScope")
     }
     @Test func selectorsCannotProveAnEmptyTarget() throws {
-        let policy = ArchitecturePolicy(id: "empty", kind: "forbiddenDependency", from: EntitySelector(name: "Missing"), to: EntitySelector(id: "b"), approved: true)
+        let policy = ArchitecturePolicy(id: "empty", kind: "forbiddenDependency", from: EntitySelector(name: "Missing"), to: EntitySelector(id: "b"))
         #expect(try ArchitectureRuleEvaluator().evaluate(policy, inventory: Self.inventory()).outcome == "unknown")
     }
     @Test func cyclesAreExplicitPoliciesAndReturnExactFacts() throws {
@@ -43,8 +43,8 @@ import VerificationStore
         return EvidenceAssociation.make(evidence: evidence,changeRevisionID: nil,input: input,status: "matchesInputs",basis: "Fixture exact input",unknownBoundaries: [],reuseDecision: "originalExecution")
     }
     @Test func evidenceCannotCrossBackendDomains() throws {
-        let formal = FormalCheck(id: "proof", source: "Source.swift", mode: "finite", specification: "oracle.json", toolchain: "/tools", approved: true, acceptUnvalidatedModel: true)
-        let job = VerificationJob(id: "proof", backend: "formal", required: true, approved: true, formal: formal)
+        let formal = FormalCheck(id: "proof", source: "Source.swift", mode: "finite", specification: "oracle.json", toolchain: "/tools", acceptUnvalidatedModel: true)
+        let job = VerificationJob(id: "proof", backend: "formal", required: true, formal: formal)
         let architecture = try Self.evidence("proof")
         let wrongJob = try Self.evidence("another",domain: "generatedModel",translation: "unvalidated")
         let model = try Self.evidence("proof",domain: "generatedModel",translation: "unvalidated")

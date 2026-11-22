@@ -28,7 +28,7 @@ import VerificationStore
         private var blocked = false
         init(repository: SQLiteVerificationStore,plan: VerificationPlan,epoch: String) { self.repository = repository; self.plan = plan; self.epoch = epoch }
         func block() { blocked = true }
-        func execute(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
+        func execute(_ demand: RunDemand) async throws -> String {
             guard case .preparePlan = demand.request else { throw InvarError("TEST_UNEXPECTED_OPERATION","Watch source fixture only prepares its retained exact plan") }
             running = true; preparations += 1
             defer { running = false }
@@ -50,14 +50,17 @@ import VerificationStore
         let value = try await WatchRecordTests().fixture(), events = Events(), backend = ReassociationTests.CountingStatic()
         let inputs = Inputs(repository: value.store,plan: value.plan,epoch: value.epoch)
         let scheduler = VerificationScheduler(backend: backend,repository: value.store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: inputs,epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: inputs,epoch: value.epoch,maximumDemands: 8)
         let registry = try WatchRegistry(repository: value.store,coordinator: coordinator,events: events,probe: inputs,workspaceID: value.record.workspaceID,epoch: value.epoch,policy: policy)
         defer {
-            do { try await registry.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await registry.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let record = try await WatchRecordTests().register(value)
         try await registry.start()
-        try await wait { try await value.store.loadWatch(record.id).lastView != nil }
+        try await wait {
+            let watch = try await value.store.loadWatch(record.id)
+            return watch.lastView != nil && watch.cycle.phase == "idle"
+        }
         let first = try await value.store.loadWatch(record.id)
         try await wait { await inputs.probes >= 3 }
         #expect(try await value.store.loadWatch(record.id) == first)
@@ -82,10 +85,10 @@ import VerificationStore
         let inputs = Inputs(repository: value.store,plan: value.plan,epoch: value.epoch)
         await inputs.block()
         let scheduler = VerificationScheduler(backend: SchedulerTests.ResourceFailure(),repository: value.store)
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: inputs,epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: inputs,epoch: value.epoch,maximumDemands: 8)
         let registry = try WatchRegistry(repository: value.store,coordinator: coordinator,events: events,probe: inputs,workspaceID: value.record.workspaceID,epoch: value.epoch,policy: policy)
         defer {
-            do { try await registry.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await registry.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let record = try await WatchRecordTests().register(value)
         _ = try await value.store.observeInput(value.plan.body.input,epoch: value.epoch)
@@ -104,32 +107,4 @@ import VerificationStore
         #expect(await coordinator.activeCount == 0)
         #expect(await events.polls > 1)
     }
-    @Test func policyRevocationPausesAdmissionAndDrainsAnAlreadyRunningPreparation() async throws {
-        let value = try await WatchRecordTests().fixture(), events = Events()
-        let inputs = Inputs(repository: value.store,plan: value.plan,epoch: value.epoch)
-        await inputs.block()
-        let scheduler = VerificationScheduler(backend: SchedulerTests.ResourceFailure(),repository: value.store)
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: inputs,epoch: value.epoch,maximumDemands: 8)
-        let registry = try WatchRegistry(repository: value.store,coordinator: coordinator,events: events,probe: inputs,workspaceID: value.record.workspaceID,epoch: value.epoch,policy: policy)
-        defer {
-            do { try await registry.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
-        }
-        let record = try await WatchRecordTests().register(value)
-        try await registry.start()
-        try await wait { await inputs.running }
-        let peer = try ConnectionPeer.current()
-        let revoked = DaemonAuthorityTests().policy(plan: value.plan,peer: peer,revision: 2,capabilities: [.read])
-        try await value.store.savePolicy(revoked,expectedRevision: 1)
-        try await wait {
-            let watch = try await value.store.loadWatch(record.id)
-            let running = await inputs.running
-            return watch.state == "paused" && watch.cycle.phase == "idle" && !running
-        }
-        let paused = try await value.store.loadWatch(record.id)
-        #expect(paused.failure?.code == "POLICY_DENIED")
-        #expect(await coordinator.activeCount == 0)
-        _ = try await registry.stop(record.id,principal: record.principal)
-        #expect(try await value.store.loadWatch(record.id).state == "stopped")
-    }
-
 }

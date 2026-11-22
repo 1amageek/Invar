@@ -10,7 +10,7 @@ import VerificationStore
         private(set) var preparations = 0
         init(planID: String) { self.planID = planID }
         func select(_ id: String) { planID = id }
-        func execute(_ demand: RunDemand,authority: OperationAuthority) async throws -> String {
+        func execute(_ demand: RunDemand) async throws -> String {
             guard case .preparePlan = demand.request else { throw InvarError("TEST_UNEXPECTED_OPERATION","Cycle fixture only prepares an existing exact plan") }
             preparations += 1
             return planID
@@ -21,11 +21,11 @@ import VerificationStore
         let value = try await WatchRecordTests().fixture()
         let inputs = Inputs(planID: value.plan.id), backend = ReassociationTests.CountingStatic()
         let scheduler = VerificationScheduler(backend: backend,repository: value.store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: inputs,epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: inputs,epoch: value.epoch,maximumDemands: 8)
         let lifecycle = WatchLifecycle(repository: value.store,coordinator: coordinator)
         let driver = WatchCycleDriver(repository: value.store,coordinator: coordinator,probe: inputs,lifecycle: lifecycle)
         defer {
-            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let registered = try await WatchRecordTests().register(value)
         _ = try await value.store.observeInput(value.plan.body.input,epoch: value.epoch)
@@ -60,11 +60,11 @@ import VerificationStore
         let value = try await WatchRecordTests().fixture()
         let inputs = Inputs(planID: value.plan.id), backend = ReassociationTests.CountingStatic()
         let scheduler = VerificationScheduler(backend: backend,repository: value.store,applicability: SchedulerTests.Current(value: "matchesInputs"))
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: inputs,epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: inputs,epoch: value.epoch,maximumDemands: 8)
         let lifecycle = WatchLifecycle(repository: value.store,coordinator: coordinator)
         let driver = WatchCycleDriver(repository: value.store,coordinator: coordinator,probe: inputs,lifecycle: lifecycle)
         defer {
-            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let registered = try await WatchRecordTests().register(value)
         _ = try await value.store.observeInput(value.plan.body.input,epoch: value.epoch)
@@ -83,11 +83,11 @@ import VerificationStore
         let value = try await WatchRecordTests().fixture(), preparation = WatchLifecycleTests.Preparation()
         let inputs = Inputs(planID: value.plan.id)
         let scheduler = VerificationScheduler(backend: SchedulerTests.ResourceFailure(),repository: value.store)
-        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,authorization: value.authority,operations: preparation,epoch: value.epoch,maximumDemands: 8)
+        let coordinator = WorkspaceCoordinator(repository: value.store,scheduler: scheduler,operations: preparation,epoch: value.epoch,maximumDemands: 8)
         let lifecycle = WatchLifecycle(repository: value.store,coordinator: coordinator)
         let driver = WatchCycleDriver(repository: value.store,coordinator: coordinator,probe: inputs,lifecycle: lifecycle)
         defer {
-            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); await value.authority.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
+            do { try await lifecycle.shutdown(); try await coordinator.shutdown(); try await value.store.shutdown(); try FileManager.default.removeItem(at: value.root) } catch { Issue.record(error) }
         }
         let registered = try await WatchRecordTests().register(value)
         let task = Task { try await driver.run(registered.id,force: true) }

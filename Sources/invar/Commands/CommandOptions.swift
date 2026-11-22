@@ -9,7 +9,7 @@ struct CommandOptions: Sendable {
         let commands: Set<String> = ["capabilities","change-open","change-seal","change","change-revision","plan","plan-info","run","ci","report","replay","operation","receipt","cancel","watch","watch-stop","watch-status","watches","current","source-status","view","evidence","publication","provider-action","mcp"]
         guard let command = arguments.first, commands.contains(command) else { throw InvarError("INVALID_ARGUMENT","Unknown daemon SDK command",exitCode: 2) }
         self.command = command
-        let allowed: Set<String> = ["workspace","state","client-state","client-profile","capabilities","contracts","plan","run","change","change-revision","operation-id","action-id","envelope-id","watch-id","view-id","evidence-id","key","wait","out","workers","memory-mib","timeout","run-timeout","processes","cpu-seconds","scratch-mib"]
+        let allowed: Set<String> = ["workspace","state","contracts","plan","run","change","change-revision","operation-id","action-id","envelope-id","watch-id","view-id","evidence-id","key","wait","out","workers","memory-mib","timeout","run-timeout","processes","cpu-seconds","scratch-mib"]
         var values: [String:String] = [:], index = 1
         while index < arguments.count {
             let argument = arguments[index], key = String(argument.dropFirst(2))
@@ -27,13 +27,6 @@ struct CommandOptions: Sendable {
     func required(_ key: String) throws -> String {
         guard let value = values[key], !value.isEmpty, value.utf8.count <= 1024 else { throw InvarError("INVALID_ARGUMENT","Missing bounded --" + key,exitCode: 2) }
         return value
-    }
-    func capabilities() throws -> Set<WorkspaceCapability> {
-        guard let text = values["capabilities"] else { return [.read,.changes,.planning,.verification,.watching] }
-        let names = text.split(separator: ",",omittingEmptySubsequences: false).map(String.init)
-        let values = names.compactMap(WorkspaceCapability.init(rawValue:))
-        guard values.count == names.count, !values.isEmpty, Set(values).count == values.count, !values.contains(.administration) else { throw InvarError("INVALID_ARGUMENT","Choose distinct ordinary SDK capability names",exitCode: 2) }
-        return Set(values)
     }
     func integer(_ key: String,default fallback: Int) throws -> Int {
         guard let text = values[key] else { return fallback }

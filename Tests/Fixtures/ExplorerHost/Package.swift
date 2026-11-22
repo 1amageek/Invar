@@ -5,9 +5,9 @@ let package = Package(
     name: "InvarExplorerHost",
     platforms: [.macOS("27.0")],
     dependencies: [
-        .package(url: "https://github.com/1amageek/Invar.git", exact: "0.1.0"),
-        .package(url: "https://github.com/1amageek/ArchitectureExplorer.git", exact: "0.1.0"),
-        .package(url: "https://github.com/1amageek/swift-formal.git", exact: "0.1.0"),
+        .package(url: "https://github.com/1amageek/Invar.git", exact: "0.1.3"),
+        .package(url: "https://github.com/1amageek/ArchitectureExplorer.git", exact: "0.1.3"),
+        .package(url: "https://github.com/1amageek/swift-formal.git", exact: "0.1.1"),
     ],
     targets: [.executableTarget(name: "InvarExplorerHost",dependencies: [
         .product(name: "VerificationFormal",package: "invar"),.product(name: "FormalEvidence",package: "swift-formal"),

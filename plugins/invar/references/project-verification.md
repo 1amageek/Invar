@@ -8,7 +8,7 @@ The target repository owns the manifest, governing specifications, production in
 
 Each requirement has three assessments. The field names identify their stages in the manifest and report.
 
-`architectureInputs` records exact path/SHA-256 references for root `ARCHITECTURE.dsl` and any local DSL fragments it uses. Supply the root even when the project has zero production sources. Absent architecture is incomplete at requirements. The approved run checks the references against its sealed inputs. The requirements review binds the architecture design and its validation. The integration review binds those declaration bytes plus production and relevant configuration references and reviews their correspondence. Specification checker receipts remain independently reusable when their requirements and model inputs have not changed.
+`architectureInputs` records exact path/SHA-256 references for root `ARCHITECTURE.dsl` and any local DSL fragments it uses. Supply the root even when the project has zero production sources. Absent architecture is incomplete at requirements. The verification run checks the references against its sealed inputs. The requirements review binds the architecture design and its validation. The integration review binds those declaration bytes plus production and relevant configuration references and reviews their correspondence. Specification checker receipts remain independently reusable when their requirements and model inputs have not changed.
 
 | Field | Verification stage |
 |---|---|
@@ -42,7 +42,7 @@ Each review reference identifies a JSON record with schemaVersion=1, stage, requ
 
 inputs binds the exact evidence inspected. All stages include the governing inventory source and governingDocuments. Specification includes its relevant checker receipts. Implementation includes productionInputs and its relevant receipts. Correspondence includes productionInputs and both implementation/correspondence receipts. Integration includes productionInputs, every checker receipt and all lower-stage review references. Hash binding makes later edits invalidate the review. Missing basis or review coverage makes the gate incomplete.
 
-A passed review has no findings. changesRequested has at least one finding containing requirementID, returnTo and reason. The return owner must be the reviewed stage or an earlier stage. A requested revision invalidates that owning gate and blocks its dependent gates. A review is an Agent attestation over recorded inputs; it is neither formal proof nor an execution grant.
+A passed review has no findings. changesRequested has at least one finding containing requirementID, returnTo and reason. The return owner must be the reviewed stage or an earlier stage. A requested revision invalidates that owning gate and blocks its dependent gates. A review is an Agent attestation over recorded inputs. Formal claims require checker receipts.
 
 ## Derived report and completion
 
@@ -54,8 +54,8 @@ Exit 0 requires every requirement's specification, implementation and validated 
 
 ## Execution transport
 
-A selected C4 subject owns Verification/Project/invar.json beside its declaration directory. The approved profile binds the subject, argv, tool digests, governing inputs, report location and operational budget. Explorer enters the destination before availability reads; its confirmed action seals inputs, executes on a private copy and publishes to the original snapshot/subject.
+A selected C4 subject owns Verification/Project/invar.json beside its declaration directory. The verification configuration binds the subject, argv, tool digests, governing inputs, report location and operational budget. Explorer enters the destination before availability reads; its confirmed action seals inputs, executes on a private copy and publishes to the original snapshot/subject.
 
-Agent MCP uses invar_plan with that configuration and budget, then invar_run with the returned plan/snapshot/subject. The session needs approved planning, verification, nativeExecution and userLeanExecution capabilities. Read the original operation, report and publication to completion. Reopening a report or reconnecting a client does not authorize a replacement execution.
+Agent MCP uses invar_plan with that configuration and budget, then invar_run with the returned plan/snapshot/subject. Read the original operation, report and publication to completion. Reopening a report or reconnecting a client reads the original operation.
 
-Use the Explorer Workspace entity as the project subject when starting a new project. Specification Verification uses a reviewed `SPEC.md` and `ARCHITECTURE.dsl` together with approved model/checker inputs. The optional `project.stage` value `greenfieldSpecification` requires a sealed input with no Swift or Rust sources and an empty production inventory in its report. After the independent evidence and specification review pass, integrate those receipts with a new implementation snapshot. The Workspace may show a valid incomplete project report before any production input exists.
+Use the Explorer Workspace entity as the project subject when starting a new project. Specification Verification uses a reviewed `SPEC.md` and `ARCHITECTURE.dsl` together with captured model/checker inputs. The optional `project.stage` value `greenfieldSpecification` requires a sealed input with no Swift or Rust sources and an empty production inventory in its report. After the independent evidence and specification review pass, integrate those receipts with a new implementation snapshot. The Workspace may show a valid incomplete project report before any production input exists.
