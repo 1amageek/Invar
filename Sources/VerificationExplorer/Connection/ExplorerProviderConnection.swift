@@ -30,8 +30,12 @@ public actor ExplorerProviderConnection: ExplorerConnecting, ProjectArchitecture
             let record = try JSONDecoder().decode([String:String].self,from: bytes)
             let manifestBytes = try CanonicalJSON.encode(manifest)
             let digest = CanonicalJSON.digest(manifestBytes)
-            guard record["manifestDigest"] == digest, let credential = record["credential"], (32...256).contains(credential.utf8.count) else { throw InvarError("APPROVAL_REQUIRED","Explorer manifest changed; explicitly remove/reapprove the old resume record",exitCode: 8) }
-            resumeCredential = credential
+            guard let recordedDigest = record["manifestDigest"], recordedDigest.utf8.count == 64,
+                  recordedDigest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+                  let credential = record["credential"], (32...256).contains(credential.utf8.count) else {
+                throw InvarError("AUTHENTICATION_REQUIRED","Invalid Explorer resume record",exitCode: 8)
+            }
+            if recordedDigest == digest { resumeCredential = credential }
         }
     }
     public func start() async throws -> ExplorerConnectionStatus {

@@ -152,8 +152,14 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     runtime = Path('/tmp') / f"invar-{os.getuid()}-{identity['workspaceID'][-24:]}"
     try:
         assert not (root / 'state' / 'verification.sqlite').exists()
+        legacy_resume = root / 'state' / 'explorer-resume.json'
+        legacy_resume.parent.mkdir(mode=0o700, exist_ok=True)
+        legacy_resume.write_text(json.dumps({'manifestDigest': 'a' * 64, 'credential': 'b' * 72}))
+        legacy_resume.chmod(0o600)
+        legacy_record = legacy_resume.read_bytes()
         cold = mcp_status(mcp, nested)
         assert cold['workspaceID'] == identity['workspaceID'] and cold['protocolVersion'] == 3
+        assert legacy_resume.read_bytes() == legacy_record
         browser_epoch = verify_browser(nested, state, identity['workspaceID'])
         assert invoke([binary, 'status', *state], nested)['epoch'] == browser_epoch == cold['epoch']
         invoke([binary, 'stop', '--deadline', '2', *state], nested)
