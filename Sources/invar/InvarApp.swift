@@ -11,7 +11,7 @@ import FormalCore
 
 @main
 struct InvarApp {
-    static let version = "0.1.4"
+    static let version = "0.1.5"
     static func main() async {
         let arguments = Array(CommandLine.arguments.dropFirst())
         ProcessSignals.install()

@@ -51,7 +51,7 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@0.1.4 invar
+mint install 1amageek/Invar@0.1.5 invar
 invar
 ```
 
@@ -67,7 +67,16 @@ invar stop
 
 `invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. The plugin runs `invar mcp` in the agent's project directory. MCP shares the workspace daemon or starts it on first use. Explicit stop holds until the next explicit start.
 
-Invar registers automatically with its bundled Explorer for snapshot access and result publication. After replacing an installation, restart the workspace's Invar daemon and Explorer index using the corresponding installations. The new pair registers again and keeps previously published results.
+Invar registers automatically with its bundled Explorer for snapshot access and result publication. To upgrade a workspace with running services, close Explorer and run the following from the project root before installing the new version.
+
+```sh
+old_invar=$(realpath "$(command -v invar)")
+"$old_invar" stop
+old_host="$(dirname "$old_invar")/Invar_invar.bundle/Contents/Resources/architecture-host"
+"$old_host" stop --workspace "$PWD"
+```
+
+Run the new `invar` in that workspace after installation. The new pair registers again and keeps previously published results. Repeat for each workspace with running services.
 
 ## Install the agent plugin
 
@@ -76,18 +85,18 @@ The Invar marketplace ships the skills and starts its MCP server with `invar mcp
 For Codex, run these commands in a terminal.
 
 ```sh
-codex plugin marketplace add 1amageek/Invar --ref 0.1.4
+codex plugin marketplace add 1amageek/Invar --ref 0.1.5
 codex plugin add invar@invar-local
 ```
 
 For Claude Code, use its plugin commands.
 
 ```text
-/plugin marketplace add 1amageek/Invar#0.1.4
+/plugin marketplace add 1amageek/Invar#0.1.5
 /plugin install invar@invar-local
 ```
 
-CLI and MCP connect to the workspace daemon through the current macOS user’s private socket. Start Invar in the workspace and connect its Provider through Architecture Explorer for snapshot-bound capture and publication. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
+CLI and MCP connect to the workspace daemon through the current macOS user’s private socket. Start Invar in the workspace to capture inputs and publish results against an Explorer snapshot. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
 
 ```sh
 invar --workspace /path/to/target
