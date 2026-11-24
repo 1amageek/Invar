@@ -18,6 +18,8 @@ The two TLA+ and Lean verification stages answer different questions. **Specific
 
 Review each stage before proceeding. If a review finds a problem, return to the stage that owns it and repeat the affected checks and reviews. For an existing-code audit, Invar can retain downstream diagnostics while an earlier stage is incomplete. Whole-project success requires evidence for every required assessment, coverage of the declared production inputs, and all five stage reviews. Missing evidence keeps the report incomplete and identifies the stage to return to. [Project verification contract](plugins/invar/references/project-verification.md)
 
+For Swift projects, the agent runs deslop as part of implementation review before Implementation Model Verification. [Structural review](plugins/invar/skills/verify-project/SKILL.md#check-implementation-structure)
+
 ## Run verification from an agent
 
 The local Invar plugin bundles five skills and a stdio MCP server for Codex and Claude Code.

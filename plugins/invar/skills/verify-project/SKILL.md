@@ -23,7 +23,19 @@ For a source-free project, use the Workspace entity as the subject, capture the 
 
 In either case, use [verify-spec](../verify-spec/SKILL.md) for independent TLA+/Lean obligations derived from `SPEC.md`. Reuse receipts and reviews whose governing inputs are intact. Run missing or outdated checks through Invar, inspect the checker evidence and bounds, and publish the reviewed specification assessment using the original receipt closure. Pass the requirements and specification gates before creating or changing production code.
 
-Continue with the requested implementation work or the existing implementation under review, and run applicable tests. Compare the `ARCHITECTURE.dsl` contract with the actual entry points, data ownership, dependencies and effective configuration via [generate-architecture](../generate-architecture/SKILL.md). Review any differences against the original intent and return to the owning stage to correct them. Record the reconciliation in the integration review and bind it to the exact DSL files and implementation evidence. Submit the implementation and integration workflow through Invar on the snapshot that contains the reviewed contracts and implementation.
+Continue with the requested implementation work or the existing implementation under review, and run applicable tests and the structural review below. Compare the `ARCHITECTURE.dsl` contract with the actual entry points, data ownership, dependencies and effective configuration via [generate-architecture](../generate-architecture/SKILL.md). Review any differences against the original intent and return to the owning stage to correct them. Record the reconciliation in the integration review and bind it to the exact DSL files and implementation evidence. Submit the implementation and integration workflow through Invar on the snapshot that contains the reviewed contracts and implementation.
+
+### Check implementation structure
+
+For a Swift change or a project-wide Swift review, run [deslop](https://github.com/1amageek/deslop) before Implementation Model Verification. Run it for each Swift package or Xcode scheme in the reviewed scope. Use a fresh compiler index for the reviewed inputs and the relevant build configurations. Record any platform or conditional code outside that scope. For non-Swift code, use `deslop check --model` when the project has a frontend that produces a current deslop model for that scope. Record applicability in the implementation review.
+
+Use `--allow <path>` when the repository has a reviewed allowlist. Preserve that baseline during the check. Bind the command, tool identity, build scope, exit status and retained diagnostics to the implementation review's exact inputs. Reuse a result only when those inputs, build configuration, tool and baseline still match.
+
+| Result | Implementation review decision |
+|---|---|
+| Exit 0 | The structural check passes for the recorded scope. Continue with the applicable tests and model checks. |
+| Exit 1 | Review the findings against the affected contracts. Record required changes with `returnTo: implementation`, fix the underlying structure and rerun the check. |
+| Exit 2, missing tool or interrupted check | Keep the review incomplete. Resolve the execution prerequisite and rerun against the same inputs or capture the revised inputs. |
 
 ## Execute the reviewed gates
 
@@ -31,7 +43,7 @@ Continue with the requested implementation work or the existing implementation u
 |---|---|---|---|
 | requirements | Complete inventory, assumptions, scope, `ARCHITECTURE.dsl` and a bound requirements review | Requirements and architecture are explicit and consistent, and both are reviewed over exact governing inputs | requirements |
 | specification | Run [Specification Verification](../verify-spec/SKILL.md) to produce independent TLA+/Lean checks and receipts | Every required specification assessment has checker evidence and a current passed review | requirements for a wrong requirement, or specification for an incorrect or incomplete formalization |
-| implementation | Run [Implementation Model Verification](../formal-verification/SKILL.md) against models from the captured production inputs | Actual named conditions were checked, all required production inputs are covered, and the review passes | implementation for a code defect, or specification for a missing or wrong condition |
+| implementation | Review the implementation structure and run [Implementation Model Verification](../formal-verification/SKILL.md) against models from the captured production inputs | Applicable structural checks passed, actual named conditions were checked, all required production inputs are covered, and the review passes | implementation for a code defect, or specification for a missing or wrong condition |
 | correspondence | Run Source-to-Model Validation on the exact production sources and the same models used for Implementation Model Verification | Validated correspondence evidence and its review cover every requirement | correspondence for a transformation or validation defect, or implementation if the captured target is wrong |
 | integration | Rebuild the complete report and review implementation and configuration against the architecture contract | All three assessments of every requirement, the architecture comparison, applicable Explorer trace reviews, and all five reviewed gates pass | The earliest owning stage identified by the finding |
 
