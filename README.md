@@ -22,11 +22,14 @@ For Swift projects, the agent runs deslop as part of implementation review befor
 
 ## Run verification from an agent
 
-The local Invar plugin bundles five skills and a stdio MCP server for Codex and Claude Code.
+The Invar plugin bundles eight skills and a stdio MCP server for Codex and Claude Code.
 
 | Skill | Use it to |
 |---|---|
 | `$verify-project` | Review the complete requirements inventory, run the verification stages, and publish the whole-project report. [Verify Project](plugins/invar/skills/verify-project/SKILL.md) |
+| `$requirements-engineering` | Establish verifiable requirements and acceptance criteria. [Requirements Engineering](plugins/invar/skills/requirements-engineering/SKILL.md) |
+| `$scope-analysis` | Analyze change boundaries and impact, then review the final diff against the requirements. [Scope Analysis](plugins/invar/skills/scope-analysis/SKILL.md) |
+| `$scope-management` | Maintain the authorized scope and judge completion from current evidence. [Scope Management](plugins/invar/skills/scope-management/SKILL.md) |
 | `$verify-spec` | Run scoped **Specification Verification**. Keep authored TLA+ and Lean models under `Verification/Specifications/<subject>/`. [Specification Verification](plugins/invar/skills/verify-spec/SKILL.md) |
 | `$formal-verification` | Run scoped **Implementation Model Verification**. Keep node-level preconditions and expected results in `Verification/<subject>/properties.json`. [Implementation Model Verification](plugins/invar/skills/formal-verification/SKILL.md) |
 | `$generate-architecture` | Inspect requirements, implementation, and configuration to build or update `ARCHITECTURE.dsl` for Explorer's C1 and C2 Map. [Generate Architecture](plugins/invar/skills/generate-architecture/SKILL.md) |
