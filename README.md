@@ -99,7 +99,7 @@ Open the target repository as the agent's working directory. Add this project-le
 ```markdown
 ## Project verification
 
-When asked to verify this project, read `skill://invar/verify-project/SKILL.md` through the Invar MCP server before planning. Use MCP resource reads to follow its linked guidance. Run the requested checks and read their retained results through Invar MCP. Report any stage or check without evidence as incomplete.
+When asked to verify this project, read `skill://invar/verify-project/SKILL.md` through Invar MCP. Resolve the target project and first open Architecture Explorer in the current Codex chat’s in-app browser using the Invar MCP server’s executable with `--workspace <workspace-root> --codex-browser`. Open the local URL printed by the command with the in-app browser control, or reuse a working Explorer tab already open for that workspace. Confirm the workspace path and that its architecture diagram is visible before planning or running verification. Follow the skill’s linked guidance through MCP, including its startup procedure for source-free workspaces. Run the requested checks and read their retained results through Invar MCP. Report any stage or check without evidence as incomplete.
 ```
 
 In Codex, ask for verification in plain language. For Claude Code, make the same project instructions available in `CLAUDE.md`. Invar upgrades carry the current skill catalog and tool implementation together. Keep the registered executable path stable across upgrades. After confirming the direct connection, disable any previously installed Invar agent plugin to avoid duplicate entries.

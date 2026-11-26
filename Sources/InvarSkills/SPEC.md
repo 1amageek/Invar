@@ -53,4 +53,4 @@ The generate-sequences skill captures the ordered interactions of a selected use
 | SK01 | The Invar stdio server advertises the official Skills extension and exposes the bundled skills with their complete manifests. Invar MCP is the distribution entry point for skill content. |
 | SK02 | An MCP client can read each skill and all linked guidance or helper files from the server. The bytes and digests agree with the bundled content. The catalog includes only shipped skill files. |
 | SK03 | Skills are static installation data. An MCP connection can discover them alongside the existing verification tools. Workspace content never adds or replaces a catalog entry. |
-| SK04 | A fresh Codex session with a configured Invar MCP server and a project-local AGENTS.md can open the project verification skill, read the linked evidence contract, execute a configured check and read the recorded result. |
+| SK04 | A fresh Codex session with a configured Invar MCP server and a project-local AGENTS.md can open the verification skill, show the target architecture in the chat’s in-app browser, then execute a configured check and read the recorded result. |
