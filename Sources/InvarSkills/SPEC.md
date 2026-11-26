@@ -11,7 +11,7 @@
 | PV07 | Truthful completion | Every requirement needs successful specification, implementation and correspondence assessments. Empty inventories and missing evidence cannot yield a complete report. |
 | PV08 | Observable whole-project result | Explorer displays the complete inventory and both verification phases with correspondence, including hidden or filtered unmet requirements. |
 
-The execution authorities of existing tools remain their owners. The report builder consumes records and never executes workspace commands. Receipts preserve original commands, process outcomes, domains, scopes and hashes. The report integrity check does not certify an untrusted producer. The plugin workflow reviews requirements, Specification Verification, Implementation Model Verification, Source-to-Model Validation and integration evidence before publishing the whole result.
+The execution authorities of existing tools remain their owners. The report builder consumes records and never executes workspace commands. Receipts preserve original commands, process outcomes, domains, scopes and hashes. The report integrity check does not certify an untrusted producer. The project workflow reviews requirements, Specification Verification, Implementation Model Verification, Source-to-Model Validation and integration evidence before publishing the whole result.
 
 ## Project verification action
 
@@ -20,7 +20,7 @@ The execution authorities of existing tools remain their owners. The report buil
 | PA01 | A Map system/container starts the registered verify-project action, bound to one subject, workspace, snapshot and original manifest. The selected declaration directory owns Verification/Project/invar.json. Its project.subjectID must match the subject. |
 | PA02 | A deliberate verification request runs against the configuration and inputs captured for its workspace snapshot. CLI, MCP and Explorer use the same execution rules. Edits can produce a new run without approval records or per-client permissions. |
 | PA03 | The plan reads the complete captured input except its previous report and retained run output directory. A private writable copy owns execution; live repository sources are never used as execution inputs. Tool file identities are checked before and after. |
-| PA04 | The project workflow runs Specification Verification and Implementation Model Verification, emits an immutable receipt manifest, and uses the plugin report builder to validate the complete acceptance inventory, receipt hashes, domains and evidence for Source-to-Model Validation. Missing or unsupported evidence remains incomplete. |
+| PA04 | The project workflow runs Specification Verification and Implementation Model Verification, emits an immutable receipt manifest, and uses the report builder to validate the complete acceptance inventory, receipt hashes, domains and evidence for Source-to-Model Validation. Missing or unsupported evidence remains incomplete. |
 | PA05 | A valid completed report with verdict passed/failed/incomplete corresponds to process exit 0/5/6. A nonmatching exit, absent report, changed receipt/input or empty inventory cannot produce a checked result. Process deadlines, cancellation and restart preserve non-success. |
 | PA06 | The existing durable Action ledger, scheduler, process journal and publication outbox own at-most-once admission, execution, cancellation and original-snapshot publication. A retry of reading or returning to a view never starts work. |
 | PA07 | The whole report is published as a graph contribution and an outcome annotation bound to the original subject. The report keeps all three assessments and the complete inventory. Explorer displays the outcome and can reopen the original evidence. |
@@ -31,7 +31,7 @@ The verification daemon serves the local OS user through private Unix sockets. R
 
 | ID | Requirement |
 |---|---|
-| WG01 | verify-project owns whole-project orchestration. verify-spec and formal-verification own their assigned stages and do not duplicate or recursively restart the project workflow. AGENTS.md remains the global authority and is not modified by this plugin. |
+| WG01 | verify-project owns whole-project orchestration. verify-spec and formal-verification own their assigned stages and do not duplicate or recursively restart the project workflow. Global development rules are owned by AGENTS.md. |
 | WG02 | Schema-2 project manifests retain the complete acceptance inventory, declared production inputs, checker receipts and stage reviews. The ordered stages are requirements, specification, implementation, correspondence and integration. Each gate needs its evidence and current review; a later observation cannot pass an earlier gate. |
 | WG03 | A passed formal claim names an executed successful checker activity, its method and a nonempty named obligation bound to a checked input. Implementation and correspondence claims additionally bind exact production sources and model artifacts. Generation and regression records cannot supply a passed formal assessment. |
 | WG04 | Implementation completion covers the entire declared production input inventory. Correspondence binds the same source/model inputs as implementation checking for each requirement. Hash identity alone does not establish semantic correspondence or certify a producer. |
@@ -50,6 +50,7 @@ The generate-sequences skill captures the ordered interactions of a selected use
 
 | ID | Acceptance condition |
 |---|---|
-| SK01 | The Invar stdio server advertises the official Skills extension and exposes the bundled skills with their complete manifests. The same source files supply the agent plugin. |
+| SK01 | The Invar stdio server advertises the official Skills extension and exposes the bundled skills with their complete manifests. Invar MCP is the distribution entry point for skill content. |
 | SK02 | An MCP client can read each skill and all linked guidance or helper files from the server. The bytes and digests agree with the bundled content. The catalog includes only shipped skill files. |
 | SK03 | Skills are static installation data. An MCP connection can discover them alongside the existing verification tools. Workspace content never adds or replaces a catalog entry. |
+| SK04 | A fresh Codex session with a configured Invar MCP server and a project-local AGENTS.md can open the project verification skill, read the linked evidence contract, execute a configured check and read the recorded result. |

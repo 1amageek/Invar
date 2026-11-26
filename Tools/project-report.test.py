@@ -12,7 +12,7 @@ import sys
 
 sys.dont_write_bytecode = True
 
-source = Path(__file__).resolve().parents[1] / 'plugins/invar/skills/verify-project/scripts/project_report.py'
+source = Path(__file__).resolve().parents[1] / 'Sources/InvarSkills/skills/verify-project/scripts/project_report.py'
 spec = importlib.util.spec_from_file_location('project_report', source)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)

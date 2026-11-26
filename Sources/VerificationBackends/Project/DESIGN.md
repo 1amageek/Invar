@@ -26,7 +26,7 @@ Sealed files + declared argv -> attempt workspace -> workflow receipts
 
 ## Contracts and Invariants
 
-The [workflow contract](../../../plugins/invar/SPEC.md#project-workflow-gates) adds schema-2 requirement/production inventories, typed checker activities, named obligations, exact source/model bindings and five reviewed gates. The report builder derives gate status and earliest return stage; it cannot promote generation to checking. Native ProjectReportAssessment independently rejects missing claim references, workflow/review records or a verdict inconsistent with evidence. Reviews are hash-bound Agent attestations. Formal claims require checker evidence.
+The [workflow contract](../../../Sources/InvarSkills/SPEC.md#project-workflow-gates) adds schema-2 requirement/production inventories, typed checker activities, named obligations, exact source/model bindings and five reviewed gates. The report builder derives gate status and earliest return stage; it cannot promote generation to checking. Native ProjectReportAssessment independently rejects missing claim references, workflow/review records or a verdict inconsistent with evidence. Reviews are hash-bound Agent attestations. Formal claims require checker evidence.
 
 ```text
 requirements -> specification -> implementation -> correspondence -> integration

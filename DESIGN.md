@@ -4,7 +4,7 @@
 System and SwiftPM package master. No parent. Design the daemon and SDK used by Agents and the user viewing ArchitectureExplorer. The target is a breaking development revision; implementation and behavioral acceptance are in progress. Current executable evidence and exact replacement gates are in [SDK transition](Documentation/SDK-TRANSITION.md). The implemented host remains Swift 6.4.1 / macOS 27 arm64; additional platforms are not claimed.
 
 ## Responsibilities and Boundaries
-Invar generates a declarative C4 workspace from explicitly scoped implementation and configuration. Its verification subsystem owns observed changes, declared obligations, planning, bounded execution, immutable evidence, applicability and its common Agent/user view. Formal owns source profiles, model semantics, independent checking and structured formal evidence. ArchitectureExplorer owns the source index, extension authorization/publication and generic rendering. The public SwiftPM manifest pins the three upstream packages to their published SwiftPM versions. Mint installs the `invar` executable, which the published MCP plugin starts through PATH.
+Invar generates a declarative C4 workspace from explicitly scoped implementation and configuration. Its verification subsystem owns observed changes, declared obligations, planning, bounded execution, immutable evidence, applicability and its common Agent/user view. Formal owns source profiles, model semantics, independent checking and structured formal evidence. ArchitectureExplorer owns the source index, extension authorization/publication and generic rendering. The public SwiftPM manifest pins the three upstream packages to their published SwiftPM versions. Mint installs the `invar` executable, which agents start as a stdio MCP server.
 
 ## Related Designs
 | Design | Relationship | Contract Used | Summary | Cautions |
@@ -94,4 +94,4 @@ The default Agent/Explorer view is the acknowledged complete published head; [Ev
 
 The [Explorer evidence delivery contract](Documentation/EXPLORER-EVIDENCE.md) identifies the producer-owned records and publication guarantees.
 
-The [whole-project verification workflow](plugins/invar/skills/verify-project/SKILL.md) and [plugin acceptance contract](plugins/invar/SPEC.md) own complete acceptance inventories and the evidence requirements for Specification Verification, Implementation Model Verification and Source-to-Model Validation. The plugin report builder consumes receipts and derives the verification verdict.
+The [whole-project verification workflow](Sources/InvarSkills/skills/verify-project/SKILL.md) and [verification acceptance contract](Sources/InvarSkills/SPEC.md) own complete acceptance inventories and the evidence requirements for Specification Verification, Implementation Model Verification and Source-to-Model Validation. The report builder consumes receipts and derives the verification verdict.

@@ -16,26 +16,26 @@ The two TLA+ and Lean verification stages answer different questions. **Specific
 | **Implementation Model Verification** | Use swift-formal to generate a model from supported production code and run the applicable TLA+ or Lean checks for the named conditions. The result establishes the checked property within the generated model's stated scope. |
 | **Source-to-Model Validation** | Establish that the generated model preserves the relevant behavior of the exact source files. The current generated-model workflow reports this as `UNVALIDATED`. |
 
-Review each stage before proceeding. If a review finds a problem, return to the stage that owns it and repeat the affected checks and reviews. For an existing-code audit, Invar can retain downstream diagnostics while an earlier stage is incomplete. Whole-project success requires evidence for every required assessment, coverage of the declared production inputs, and all five stage reviews. Missing evidence keeps the report incomplete and identifies the stage to return to. [Project verification contract](plugins/invar/skills/verify-project/references/project-verification.md)
+Review each stage before proceeding. If a review finds a problem, return to the stage that owns it and repeat the affected checks and reviews. For an existing-code audit, Invar can retain downstream diagnostics while an earlier stage is incomplete. Whole-project success requires evidence for every required assessment, coverage of the declared production inputs, and all five stage reviews. Missing evidence keeps the report incomplete and identifies the stage to return to. [Project verification contract](Sources/InvarSkills/skills/verify-project/references/project-verification.md)
 
-For Swift projects, the agent runs deslop as part of implementation review before Implementation Model Verification. [Structural review](plugins/invar/skills/verify-project/SKILL.md#check-implementation-structure)
+For Swift projects, the agent runs deslop as part of implementation review before Implementation Model Verification. [Structural review](Sources/InvarSkills/skills/verify-project/SKILL.md#check-implementation-structure)
 
 ## Run verification from an agent
 
-Invar serves eight skills from its stdio MCP server using the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview). Connect to `invar mcp` from a project directory. An extension-aware client discovers skills with `skills/list`, looks up entries with `skills/get`, and reads their files using `resources/read`. Each manifest includes the byte sizes and SHA-256 digests of the skill and its supporting files. Clients with standard MCP Resources can also discover the entrypoints through `resources/list`. The Codex and Claude Code plugin packages the same skill files for hosts that use local skill discovery.
+Invar serves eight skills from its stdio MCP server using the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview). Connect to `invar mcp` from a project directory. An extension-aware client discovers skills with `skills/list`, looks up entries with `skills/get`, and reads their files using `resources/read`. Each manifest includes the byte sizes and SHA-256 digests of the skill and its supporting files. Clients with standard MCP Resources can also discover the entrypoints through `resources/list`.
 
 | Skill | Use it to |
 |---|---|
-| `$verify-project` | Review the complete requirements inventory, run the verification stages, and publish the whole-project report. [Verify Project](plugins/invar/skills/verify-project/SKILL.md) |
-| `$requirements-engineering` | Establish verifiable requirements and acceptance criteria. [Requirements Engineering](plugins/invar/skills/requirements-engineering/SKILL.md) |
-| `$scope-analysis` | Analyze change boundaries and impact, then review the final diff against the requirements. [Scope Analysis](plugins/invar/skills/scope-analysis/SKILL.md) |
-| `$scope-management` | Maintain the authorized scope and judge completion from current evidence. [Scope Management](plugins/invar/skills/scope-management/SKILL.md) |
-| `$verify-spec` | Run scoped **Specification Verification**. Keep authored TLA+ and Lean models under `Verification/Specifications/<subject>/`. [Specification Verification](plugins/invar/skills/verify-spec/SKILL.md) |
-| `$formal-verification` | Run scoped **Implementation Model Verification**. Keep node-level preconditions and expected results in `Verification/<subject>/properties.json`. [Implementation Model Verification](plugins/invar/skills/formal-verification/SKILL.md) |
-| `$generate-architecture` | Inspect requirements, implementation, and configuration to build or update `ARCHITECTURE.dsl` for Explorer's C1 and C2 Map. [Generate Architecture](plugins/invar/skills/generate-architecture/SKILL.md) |
-| `$generate-sequences` | Write or review `SEQUENCES.dsl` for the ordered interactions of a use case in Explorer. [Generate Sequences](plugins/invar/skills/generate-sequences/SKILL.md) |
+| `verify-project` | Review the complete requirements inventory, run the verification stages, and publish the whole-project report. [Verify Project](Sources/InvarSkills/skills/verify-project/SKILL.md) |
+| `requirements-engineering` | Establish verifiable requirements and acceptance criteria. [Requirements Engineering](Sources/InvarSkills/skills/requirements-engineering/SKILL.md) |
+| `scope-analysis` | Analyze change boundaries and impact, then review the final diff against the requirements. [Scope Analysis](Sources/InvarSkills/skills/scope-analysis/SKILL.md) |
+| `scope-management` | Maintain the authorized scope and judge completion from current evidence. [Scope Management](Sources/InvarSkills/skills/scope-management/SKILL.md) |
+| `verify-spec` | Run scoped **Specification Verification**. Keep authored TLA+ and Lean models under `Verification/Specifications/<subject>/`. [Specification Verification](Sources/InvarSkills/skills/verify-spec/SKILL.md) |
+| `formal-verification` | Run scoped **Implementation Model Verification**. Keep node-level preconditions and expected results in `Verification/<subject>/properties.json`. [Implementation Model Verification](Sources/InvarSkills/skills/formal-verification/SKILL.md) |
+| `generate-architecture` | Inspect requirements, implementation, and configuration to build or update `ARCHITECTURE.dsl` for Explorer's C1 and C2 Map. [Generate Architecture](Sources/InvarSkills/skills/generate-architecture/SKILL.md) |
+| `generate-sequences` | Write or review `SEQUENCES.dsl` for the ordered interactions of a use case in Explorer. [Generate Sequences](Sources/InvarSkills/skills/generate-sequences/SKILL.md) |
 
-Run the agent in the target workspace. For a snapshot-bound run, start with an indexed Explorer workspace and the verification configuration for the target. For the Map's **Verify project** action, place `Verification/Project/invar.json` relative to the selected system or container's declaration directory. [Project action contract](plugins/invar/SPEC.md#project-verification-action)
+Run the agent in the target workspace. For a snapshot-bound run, start with an indexed Explorer workspace and the verification configuration for the target. For the Map's **Verify project** action, place `Verification/Project/invar.json` relative to the selected system or container's declaration directory. [Project action contract](Sources/InvarSkills/SPEC.md#project-verification-action)
 
 ![The agent plans a run with Invar, Explorer supplies the pinned inputs, the worker checks them, and Invar publishes and returns the report.](Documentation/Diagrams/agent-verification.svg)
 
@@ -70,7 +70,7 @@ invar status
 invar stop
 ```
 
-`invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. The plugin runs `invar mcp` in the agent's project directory. MCP shares the workspace daemon or starts it on first use. Explicit stop holds until the next explicit start.
+`invar` prints the resolved absolute path, starts or reuses the workspace services, and opens Explorer. Use `--workspace PATH` to select a different directory, or `--no-open` to get the one-time browser URL. Closing the browser frontend leaves the verification daemon available. Run `invar mcp` in the agent's project directory. MCP shares the workspace daemon or starts it on first use. Explicit stop holds until the next explicit start.
 
 Invar registers automatically with its bundled Explorer for snapshot access and result publication. To upgrade a workspace with running services, close Explorer and run the following from the project root before installing the new version.
 
@@ -81,36 +81,30 @@ old_host="$(dirname "$old_invar")/Invar_invar.bundle/Contents/Resources/architec
 "$old_host" stop --workspace "$PWD"
 ```
 
-Run the new `invar` in that workspace after installation. The new pair registers again and keeps previously published results. Repeat for each workspace with running services.
+Run the new `invar` in that workspace after installation. The new pair registers again and keeps previously published results. Repeat for each workspace with running services. If your verification configuration still contains legacy `approved` fields, remove them and prepare a fresh plan from the current snapshot.
 
-## Install the agent plugin
+## Connect an agent to Invar MCP
 
-The Invar marketplace ships the skills and starts its MCP server with `invar mcp`. Make `invar` available on the agent's `PATH` and open the target project as the agent's working directory.
+MCP skill distribution is available from the current checkout. From this checkout, run `swift build --product invar` and use the absolute path to `.build/debug/invar` for the commands below. With an installed build that includes MCP skills, use `command -v invar` to get its path. The executable and its adjacent SwiftPM bundles supply both Explorer and the skills.
 
-For Codex, run these commands in a terminal.
-
-```sh
-codex plugin marketplace add 1amageek/Invar --ref 0.1.5
-codex plugin add invar@invar-local
-```
-
-For Claude Code, use its plugin commands.
-
-```text
-/plugin marketplace add 1amageek/Invar#0.1.5
-/plugin install invar@invar-local
-```
-
-CLI and MCP connect to the workspace daemon through the current macOS user’s private socket. Start Invar in the workspace to capture inputs and publish results against an Explorer snapshot. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
+Register the executable once in your agent.
 
 ```sh
-invar --workspace /path/to/target
-invar status --workspace /path/to/target
+codex mcp add invar -- /absolute/path/to/invar mcp
+claude mcp add --scope user --transport stdio invar -- /absolute/path/to/invar mcp
 ```
 
-When updating an existing workspace, remove the old `approved` fields from its verification configuration. Stop the running daemon with its current binary before upgrading. After upgrading, start Invar and prepare a fresh plan from the current snapshot. Existing evidence stays in the local store.
+Open the target repository as the agent's working directory. Add this project-level contract to its `AGENTS.md`.
 
-For development, run `swift build --product invar` from the Invar checkout. The executable uses the adjacent SwiftPM bundles for Explorer and MCP skills. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v invar)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/invar`.
+```markdown
+## Project verification
+
+When asked to verify this project, read `skill://invar/verify-project/SKILL.md` through the Invar MCP server before planning. Use MCP resource reads to follow its linked guidance. Run the requested checks and read their retained results through Invar MCP. Report any stage or check without evidence as incomplete.
+```
+
+In Codex, ask for verification in plain language. For Claude Code, make the same project instructions available in `CLAUDE.md`. Invar upgrades carry the current skill catalog and tool implementation together. Keep the registered executable path stable across upgrades. After confirming the direct connection, disable any previously installed Invar agent plugin to avoid duplicate entries.
+
+CLI and MCP share the workspace daemon. Start Invar in the workspace to capture inputs and publish results against an Explorer snapshot. [Trust and execution boundaries](Documentation/TRUST.md) · [CLI reference](Sources/invar/Commands/DESIGN.md)
 
 ## Generate a Map from the CLI
 

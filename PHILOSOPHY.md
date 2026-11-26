@@ -15,7 +15,7 @@ Review every stage before advancing. A wrong requirement returns to requirements
 
 ## The skill is the workflow contract
 
-The [verify-project skill](plugins/invar/skills/verify-project/SKILL.md) gives Codex and Claude the same ordered workflow, stage gates and review handoffs. Stage skills define their scoped work. The target repository owns the requirements, independent models, implementation, tests and review records. Invar binds those inputs to actual checker receipts and derives the verdict. A review, a successful process exit, a generated model and a proven property each carry their own meaning. Any gap in required proof, model correspondence, production coverage or review remains visible in the final result.
+The [verify-project skill](Sources/InvarSkills/skills/verify-project/SKILL.md) gives Codex and Claude the same ordered workflow, stage gates and review handoffs. Stage skills define their scoped work. The target repository owns the requirements, independent models, implementation, tests and review records. Invar binds those inputs to actual checker receipts and derives the verdict. A review, a successful process exit, a generated model and a proven property each carry their own meaning. Any gap in required proof, model correspondence, production coverage or review remains visible in the final result.
 
 ## Explorer connects the user and the Agent
 
@@ -26,6 +26,6 @@ The [verify-project skill](plugins/invar/skills/verify-project/SKILL.md) gives C
 | Invar | Accept workspace verification requests, run checkers on fixed inputs, retain original evidence, evaluate gates and publish results for the exact workspace and subject. |
 | Architecture Explorer | Own source indexing and navigation from architecture to implementation. Preserve dependency direction and evidence across views of the same snapshot. Give the user a direct path from the Workspace to the specification, verification controls and results. Render the same requirements, stage status, evidence and limits that the Agent can query. |
 
-Source-derived dependency candidates support architecture review. Formal guarantees depend on the checked properties, execution evidence and validated source correspondence within their recorded scope. The [workflow skill](plugins/invar/skills/verify-project/SKILL.md#execute-the-reviewed-gates) defines the integration review and its pass conditions.
+Source-derived dependency candidates support architecture review. Formal guarantees depend on the checked properties, execution evidence and validated source correspondence within their recorded scope. The [workflow skill](Sources/InvarSkills/skills/verify-project/SKILL.md#execute-the-reviewed-gates) defines the integration review and its pass conditions.
 
 The Workspace is an entry point at every stage, including when the next step is writing `SPEC.md`. A verification action opens its destination immediately and shows loading, progress or the reason it cannot proceed there. From an outcome, the user can navigate to the relevant requirement, code or model, original checker evidence and guarantee scope. The Agent can continue or reconcile the same operation through its immutable reference. The current view follows the committed publication, and earlier, failed and incomplete results remain available through their original bindings.

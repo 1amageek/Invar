@@ -17,7 +17,7 @@ The SDK owns protocol versions, codec, negotiation, stdio framing and request di
 ## Architecture
 ```text
 SDK stdio -> SDK Server -> Invar tool handler -> VerificationClient -> daemon
-                       -> SDK SkillCatalog -> bundled plugin skill files
+                       -> SDK SkillCatalog -> bundled skill files
 ```
 
 ## Contracts and Invariants
@@ -25,7 +25,7 @@ CLI and MCP submit the same typed workspace requests. Tools provide change track
 
 Execution uses a sealed plan and the canonical workspace. Tool arguments follow their declared schemas and cannot select an alternate workspace or direct command. Reports preserve the evidence status axes. Plan returns a bounded summary.
 
-The CLI packages the plugin skill directory. The SDK builds an immutable catalog from that bundle and owns extension discovery, manifests, directory listing, and file reads. Invar advertises the manifests through standard resource discovery as well. Refer to a linked sibling skill via its own catalog entry. The catalog is independent of workspace files and requires no workspace-supplied input. Resource size is bounded under the stdio frame limit.
+The CLI packages the InvarSkills target’s skill directory. The SDK builds an immutable catalog from that bundle and owns extension discovery, manifests, directory listing, and file reads. Invar advertises the manifests through standard resource discovery as well. Refer to a linked sibling skill via its own catalog entry. The catalog is independent of workspace files and requires no workspace-supplied input. Resource size is bounded under the stdio frame limit. A project can instruct its agent to read the workflow entrypoint over MCP. The Invar distribution owns skill content and versioning.
 
 ## State, Ownership, and Lifecycle
 An actor owns bounded active tool calls and subscriptions under fixed limits. SDK stop/disconnect drains protocol I/O. Application shutdown detaches owned observations and closes its client session, without cancelling other observers' work.

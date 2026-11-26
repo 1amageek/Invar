@@ -1,6 +1,6 @@
 # Verified project action behavior
 
-The [project action contract](../plugins/invar/SPEC.md#project-verification-action) identifies the admission, execution and publication requirements. Explorer owns menu navigation and rendering. Invar retains the original request, binds the captured inputs, runs the approved project command, and publishes against the original subject.
+The [project action contract](../Sources/InvarSkills/SPEC.md#project-verification-action) identifies the admission, execution and publication requirements. Explorer owns menu navigation and rendering. Invar retains the original request, binds the captured inputs, runs the approved project command, and publishes against the original subject.
 
 | Check | Observed behavior |
 |---|---|

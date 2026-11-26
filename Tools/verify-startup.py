@@ -41,7 +41,7 @@ def invoke(argv, cwd, expected=0):
 
 
 def verify_skills(request):
-    source = Path(__file__).resolve().parents[1] / 'plugins/invar/skills'
+    source = Path(__file__).resolve().parents[1] / 'Sources/InvarSkills/skills'
     entrypoints = {f'skill://invar/{file.relative_to(source).as_posix()}' for file in source.glob('*/SKILL.md')}
     assert len(entrypoints) == 8
     listed = request('skills/list')['skills']

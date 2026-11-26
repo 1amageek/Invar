@@ -1,6 +1,6 @@
 # Reviewed project verification evidence
 
-[Verify Project](../plugins/invar/skills/verify-project/SKILL.md) runs the project workflow and reviews. The [plugin contract](../plugins/invar/SPEC.md#project-workflow-gates) defines gate, coverage and evidence requirements.
+[Verify Project](../Sources/InvarSkills/skills/verify-project/SKILL.md) runs the project workflow and reviews. The [verification contract](../Sources/InvarSkills/SPEC.md#project-workflow-gates) defines gate, coverage and evidence requirements.
 
 | Evidence | Observed result |
 |---|---|
@@ -12,4 +12,4 @@
 
 The models establish their bounded gate properties. The behavioral tests exercise the receipt and report implementation. The project verdict requires independent Specification Verification, Implementation Model Verification, Source-to-Model Validation, and the required stage reviews.
 
-To run the model checks, use the pinned TLC tool with [ProjectWorkflow.cfg](Specifications/ProjectWorkflow/ProjectWorkflow.cfg) and run the Lean kernel on the Lean model. For report checks, run `python3 Tools/project-report.test.py` with a timeout. See the [receipt and review contract](../plugins/invar/skills/verify-project/references/project-verification.md) for the fields required to reproduce a report.
+To run the model checks, use the pinned TLC tool with [ProjectWorkflow.cfg](Specifications/ProjectWorkflow/ProjectWorkflow.cfg) and run the Lean kernel on the Lean model. For report checks, run `python3 Tools/project-report.test.py` with a timeout. See the [receipt and review contract](../Sources/InvarSkills/skills/verify-project/references/project-verification.md) for the fields required to reproduce a report.

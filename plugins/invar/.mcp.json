@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "invar": {
-      "command": "invar",
-      "args": ["mcp"]
-    }
-  }
-}

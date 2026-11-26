@@ -445,9 +445,7 @@ with tempfile.TemporaryDirectory(prefix="invar-real-explorer-") as directory:
                 raise AssertionError("MCP response timed out")
 
             def start_mcp():
-                plugin = json.loads((ROOT / "plugins/invar/.mcp.json").read_text())["mcpServers"]["invar"]
-                assert plugin["command"] == "invar"
-                invocation = [str(binary), *plugin["args"], *map(str, frontend_options)]
+                invocation = [str(binary), "mcp", *map(str, frontend_options)]
                 process = subprocess.Popen(invocation, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
                 mcp_processes.append(process)
                 send(process, {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"Invar process fixture","version":"2"}}})
