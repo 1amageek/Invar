@@ -43,7 +43,8 @@ def invoke(argv, cwd, expected=0):
 def verify_skills(request):
     source = Path(__file__).resolve().parents[1] / 'Sources/InvarSkills/skills'
     entrypoints = {f'skill://invar/{file.relative_to(source).as_posix()}' for file in source.glob('*/SKILL.md')}
-    assert len(entrypoints) == 8
+    assert len(entrypoints) == 9
+    assert 'skill://invar/use-invar/SKILL.md' in entrypoints
     listed = request('skills/list')['skills']
     assert {skill['uri'] for skill in listed} == entrypoints
     assert {item['uri'] for item in request('resources/list')['resources']} == entrypoints
@@ -126,6 +127,7 @@ def mcp_status(argv, cwd, protocol='2025-11-25', *, check_skills=False):
             initialized = request('initialize', protocolVersion=protocol, capabilities={}, clientInfo=client_info)
             request('notifications/initialized', notification=True)
             assert initialized['serverInfo']['name'] == 'Invar', initialized
+        assert 'skill://invar/use-invar/SKILL.md' in initialized['instructions']
         capability = initialized['capabilities']
         assert 'resources' in capability
         assert capability['extensions']['io.modelcontextprotocol/skills'] == {'directoryRead': True}
