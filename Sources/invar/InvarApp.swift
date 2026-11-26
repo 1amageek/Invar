@@ -68,7 +68,6 @@ struct InvarApp {
             }
             if command == "mcp" {
                 let options = try CommandOptions(arguments)
-                try await WorkspaceCommand.activateForMCP(options)
                 try await InvarMCP.run(options: options)
                 return 0
             }

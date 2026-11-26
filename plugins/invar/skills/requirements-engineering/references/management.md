@@ -32,4 +32,4 @@ Never modify requirements merely to make failing implementation or tests pass. D
 
 
 ## Handoff
-Use [the shared contract](../../../references/requirements-and-scope.md). Record results in the Requirements Baseline or its proposed revision; report material unknowns without asserting authorization.
+Use [the shared contract](../../scope-management/references/requirements-and-scope.md). Record results in the Requirements Baseline or its proposed revision; report material unknowns without asserting authorization.

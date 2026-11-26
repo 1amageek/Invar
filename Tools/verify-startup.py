@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Check the installed CLI's workspace selection and shared MCP lifecycle."""
 import argparse
+import base64
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import http.cookiejar
 import json
 import os
 from pathlib import Path
+import posixpath
+import re
 import select
 import shutil
 import signal
@@ -13,7 +17,7 @@ import subprocess
 import tempfile
 import time
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 parser = argparse.ArgumentParser()
@@ -36,28 +40,99 @@ def invoke(argv, cwd, expected=0):
     return json.loads(result.stdout or result.stderr)
 
 
-def mcp_status(argv, cwd):
+def verify_skills(request):
+    source = Path(__file__).resolve().parents[1] / 'plugins/invar/skills'
+    entrypoints = {f'skill://invar/{file.relative_to(source).as_posix()}' for file in source.glob('*/SKILL.md')}
+    assert len(entrypoints) == 8
+    listed = request('skills/list')['skills']
+    assert {skill['uri'] for skill in listed} == entrypoints
+    assert {item['uri'] for item in request('resources/list')['resources']} == entrypoints
+    contents = {}
+    for skill in listed:
+        uri = skill['uri']
+        assert skill['frontmatter']['name'] == uri.split('/')[-2]
+        assert request('skills/get', uri=uri)['skill'] == skill
+        directory_uri = uri.rsplit('/', 1)[0]
+        children = request('resources/directory/read', uri=directory_uri)['resources']
+        assert uri in {child['uri'] for child in children}
+        for resource in skill['resources']:
+            file_uri = resource['uri']
+            content, = request('resources/read', uri=file_uri)['contents']
+            assert content['uri'] == file_uri
+            data = content['text'].encode() if 'text' in content else base64.b64decode(content['blob'])
+            assert len(data) == resource['size']
+            assert resource['digest'] == 'sha256:' + hashlib.sha256(data).hexdigest()
+            assert data == (source / file_uri.removeprefix('skill://invar/')).read_bytes()
+            contents[file_uri] = data
+
+    expected = {f'skill://invar/{file.relative_to(source).as_posix()}'
+                for file in source.rglob('*') if file.is_file()}
+    assert set(contents) == expected
+    for uri, data in contents.items():
+        if not uri.endswith('.md'):
+            continue
+        origin = urlsplit(uri)
+        for link in re.findall(r'\]\(([^)]+)\)', data.decode()):
+            target = urlsplit(link)
+            if target.scheme or not target.path:
+                continue
+            path = posixpath.normpath(posixpath.join(posixpath.dirname(origin.path), target.path))
+            assert urlunsplit((origin.scheme, origin.netloc, path, '', '')) in contents, (uri, link)
+
+    with tempfile.TemporaryDirectory(prefix='invar-skill-helper-') as temporary:
+        helper = Path(temporary) / 'project_report.py'
+        helper.write_bytes(contents['skill://invar/verify-project/scripts/project_report.py'])
+        result = subprocess.run(['/usr/bin/python3', helper, '--help'], capture_output=True, timeout=8, check=True)
+        assert b'--manifest' in result.stdout, result.stdout
+    assert request('skills/get', expect_error=True, uri='skill://invar/unknown/SKILL.md')['code'] == -32602
+    request('resources/read', expect_error=True, uri='skill://invar/workspace-only/SKILL.md')
+
+
+def mcp_status(argv, cwd, protocol='2025-11-25', *, check_skills=False):
     process = subprocess.Popen(argv, cwd=cwd, env=environment, text=True,
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    identity = 0
+    modern = protocol == '2026-07-28'
+    client_info = {'name': 'startup regression', 'version': '1'}
     try:
-        def request(method, identity=None, **params):
+        def request(method, *, notification=False, expect_error=False, **params):
+            nonlocal identity
             message = {'jsonrpc': '2.0', 'method': method}
-            if identity is not None:
+            if modern:
+                params['_meta'] = {'io.modelcontextprotocol/protocolVersion': protocol,
+                                   'io.modelcontextprotocol/clientCapabilities': {},
+                                   'io.modelcontextprotocol/clientInfo': client_info}
+            if not notification:
+                identity += 1
                 message.update(id=identity, params=params)
             process.stdin.write(json.dumps(message) + '\n')
             process.stdin.flush()
-            if identity is None:
+            if notification:
                 return None
             assert select.select([process.stdout], [], [], 15)[0], method
-            response = process.stdout.readline()
-            assert response, process.stderr.read()
-            return json.loads(response)['result']
+            line = process.stdout.readline()
+            assert line, method
+            response = json.loads(line)
+            assert response['id'] == identity, response
+            if expect_error:
+                return response['error']
+            assert 'result' in response, response
+            return response['result']
 
-        initialized = request('initialize', 1, protocolVersion='2025-11-25', capabilities={},
-                              clientInfo={'name': 'startup regression', 'version': '1'})
-        assert initialized['serverInfo']['name'] == 'Invar'
-        request('notifications/initialized')
-        result = request('tools/call', 2, name='invar_status', arguments={})
+        if modern:
+            initialized = request('server/discover')
+            assert protocol in initialized['supportedVersions'], initialized
+        else:
+            initialized = request('initialize', protocolVersion=protocol, capabilities={}, clientInfo=client_info)
+            request('notifications/initialized', notification=True)
+            assert initialized['serverInfo']['name'] == 'Invar', initialized
+        capability = initialized['capabilities']
+        assert 'resources' in capability
+        assert capability['extensions']['io.modelcontextprotocol/skills'] == {'directoryRead': True}
+        assert {'invar_plan', 'invar_run', 'invar_report'} <= {tool['name'] for tool in request('tools/list')['tools']}
+        if check_skills:
+            verify_skills(request)
+        result = request('tools/call', name='invar_status', arguments={})
         assert not result.get('isError'), result
         return result['structuredContent']['value']
     finally:
@@ -126,6 +201,9 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     nested.mkdir(parents=True)
     subprocess.run(['/usr/bin/git', 'init', '--quiet', str(workspace)], check=True, timeout=8)
     (nested / 'Fixture.swift').write_text('public func answer() -> Int { 42 }\n')
+    workspace_skill = workspace / 'skills/workspace-only/SKILL.md'
+    workspace_skill.parent.mkdir(parents=True)
+    workspace_skill.write_text('---\nname: workspace-only\ndescription: Must stay in this workspace.\n---\n')
     state = ['--state', str(root / 'state')]
     mcp = [binary, 'mcp', *state]
     assert invoke([binary, 'status', *state], root, 2)['code'] == 'WORKSPACE_REQUIRED'
@@ -134,6 +212,7 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     incomplete_install = root / 'invar-without-bundle'
     shutil.copy2(binary, incomplete_install)
     assert invoke([incomplete_install, '--no-open', *state], nested, 3)['code'] == 'EXPLORER_UNAVAILABLE'
+    assert invoke([incomplete_install, 'mcp', *state], nested, 3)['code'] == 'SKILLS_UNAVAILABLE'
     identity = invoke([binary, 'daemon', 'identity', *state], nested)
     explicit = invoke([binary, 'daemon', 'identity', '--workspace', str(nested), *state], workspace)
     assert explicit['workspaceID'] != identity['workspaceID']
@@ -157,8 +236,10 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
         legacy_resume.write_text(json.dumps({'manifestDigest': 'a' * 64, 'credential': 'b' * 72}))
         legacy_resume.chmod(0o600)
         legacy_record = legacy_resume.read_bytes()
-        cold = mcp_status(mcp, nested)
+        cold = mcp_status(mcp, nested, check_skills=True)
         assert cold['workspaceID'] == identity['workspaceID'] and cold['protocolVersion'] == 3
+        modern = mcp_status(mcp, nested, protocol='2026-07-28', check_skills=True)
+        assert modern['workspaceID'] == cold['workspaceID'] and modern['epoch'] == cold['epoch']
         browser_epoch = verify_browser(nested, state, identity['workspaceID'])
         deadline = time.monotonic() + 8
         while invoke([binary, 'status', *state], nested)['state'] != 'ready':
@@ -201,4 +282,4 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
         result = subprocess.run([explorer, 'stop', '--workspace', str(workspace)], env=environment,
                                 capture_output=True, text=True, timeout=8)
         assert result.returncode == 0 or 'CONNECTION_FAILED' in result.stderr, result.stderr
-print('Bundled browser and assets, authenticated index, workspace selection, cold MCP start, concurrent start, MCP recovery, and explicit stop verified.')
+print('Bundled Explorer, workspace selection, MCP lifecycle, and Skills discovery and file integrity on both protocol revisions verified.')

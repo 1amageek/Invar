@@ -45,3 +45,11 @@ The verification daemon serves the local OS user through private Unix sockets. R
 ## Architecture sequences
 
 The generate-sequences skill captures the ordered interactions of a selected use case in the project's root SEQUENCES.dsl. The scenario reuses the architecture's element and relationship IDs, identifies the governing requirements, and cites the exact project material where known. Review the specification and trace the implementation when available. Architecture Explorer owns snapshot resolution, diagnostics, presentation and evidence navigation. A declared or source-supported scenario does not establish an observed execution or a verified property.
+
+## MCP skill distribution
+
+| ID | Acceptance condition |
+|---|---|
+| SK01 | The Invar stdio server advertises the official Skills extension and exposes the bundled skills with their complete manifests. The same source files supply the agent plugin. |
+| SK02 | An MCP client can read each skill and all linked guidance or helper files from the server. The bytes and digests agree with the bundled content. The catalog includes only shipped skill files. |
+| SK03 | Skills are static installation data. An MCP connection can discover them alongside the existing verification tools. Workspace content never adds or replaces a catalog entry. |

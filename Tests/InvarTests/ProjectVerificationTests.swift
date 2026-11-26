@@ -9,7 +9,7 @@ import VerificationRuntime
 import VerificationStore
 
 @Suite(.timeLimit(.minutes(1))) struct ProjectVerificationTests {
-    let builder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("plugins/invar/scripts/project_report.py")
+    let builder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("plugins/invar/skills/verify-project/scripts/project_report.py")
     func fixture(mutate: Bool = false,delay: Bool = false,stage: ProjectCheck.Stage? = nil,sourceFree: Bool = false,writeArchitectureDuringExecution: Bool = false, checkIsolation: Bool = false) throws -> (URL,BackendContext) {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("invar-project-" + UUID().uuidString)
         let input = root.appendingPathComponent("input"), output = root.appendingPathComponent("output")

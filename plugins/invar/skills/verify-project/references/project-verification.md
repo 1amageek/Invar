@@ -1,6 +1,6 @@
 # Project verification evidence contract
 
-[verify-project](../skills/verify-project/SKILL.md) is the single owner of stage order, pass conditions and return behavior. verify-spec and formal-verification execute their assigned stages. This reference owns the data exchanged with the report builder and native assessment.
+[verify-project](../SKILL.md) is the single owner of stage order, pass conditions and return behavior. verify-spec and formal-verification execute their assigned stages. This reference owns the data exchanged with the report builder and native assessment.
 
 ## Schema-2 manifest
 

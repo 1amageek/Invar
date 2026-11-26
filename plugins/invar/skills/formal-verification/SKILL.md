@@ -5,7 +5,7 @@ description: Check scoped production-derived models with swift-formal or a revie
 
 # Implementation Model Verification
 
-Whole-project orchestration belongs to [verify-project](../verify-project/SKILL.md). When assigned its implementation stage, use the reviewed requirements and independent conditions to check production-derived models. Return receipts, coverage and findings to the orchestrator. Record model generation, regressions and Source-to-Model Validation under their respective evidence domains. Use the [schema-2 evidence contract](../../references/project-verification.md) for project receipts and stage reviews.
+Whole-project orchestration belongs to [verify-project](../verify-project/SKILL.md). When assigned its implementation stage, use the reviewed requirements and independent conditions to check production-derived models. Return receipts, coverage and findings to the orchestrator. Record model generation, regressions and Source-to-Model Validation under their respective evidence domains. Use the [schema-2 evidence contract](../verify-project/references/project-verification.md) for project receipts and stage reviews.
 
 Read the selected node and its callers, dependencies, tests and design at the requested snapshot. For a browser annotation, read every page of `read_verification_request` in its originating thread and check workspace, snapshot and entity identity. If the request expired, obtain a fresh selection. Identify the production decision that owns the property, its inputs, the intended result and what the property leaves outside scope.
 

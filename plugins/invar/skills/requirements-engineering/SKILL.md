@@ -15,7 +15,7 @@ Own the meaning, validity, and revision of requirements, not implementation boun
 5. [Manage](references/management.md) baseline revisions, provenance and traceability.
 
 ## Integration
-Use the [shared contract](../../references/requirements-and-scope.md). Return a Requirements Baseline to the caller. For implementation tasks, scope-management consumes this baseline and coordinates scope-analysis. If an analysis reveals a requirement question, resolve it here and return a revised baseline only when authorized. Do not invoke scope-management recursively.
+Use the [shared contract](../scope-management/references/requirements-and-scope.md). Return a Requirements Baseline to the caller. For implementation tasks, scope-management consumes this baseline and coordinates scope-analysis. If an analysis reveals a requirement question, resolve it here and return a revised baseline only when authorized. Do not invoke scope-management recursively.
 
 Use SPEC.md where applicable; DESIGN.md covers UI/UX, architecture descriptions cover structure. Do not rewrite an approved specification to fit code. Lean/TLA+ and tests provide verification evidence, not stakeholder intent.
 

@@ -1,6 +1,6 @@
 # Scope Control
 
-Use the active Scope Baseline and SA change classifications in [the shared contract](../../../references/requirements-and-scope.md).
+Use the active Scope Baseline and SA change classifications in [the shared contract](requirements-and-scope.md).
 
 Before material edits, check that the change is required or supporting, or an authorized verification-only activity. If the finding is absent, stale, or uncertain, request targeted SA analysis. Do not repeat valid analysis.
 

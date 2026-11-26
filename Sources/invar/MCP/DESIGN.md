@@ -17,12 +17,15 @@ The SDK owns protocol versions, codec, negotiation, stdio framing and request di
 ## Architecture
 ```text
 SDK stdio -> SDK Server -> Invar tool handler -> VerificationClient -> daemon
+                       -> SDK SkillCatalog -> bundled plugin skill files
 ```
 
 ## Contracts and Invariants
 CLI and MCP submit the same typed workspace requests. Tools provide change tracking, plan, run, replay, status, cancellation, formal evidence queries and workspace watch control. Closing stdio detaches MCP observation. Durable operations and watches keep their daemon owner.
 
 Execution uses a sealed plan and the canonical workspace. Tool arguments follow their declared schemas and cannot select an alternate workspace or direct command. Reports preserve the evidence status axes. Plan returns a bounded summary.
+
+The CLI packages the plugin skill directory. The SDK builds an immutable catalog from that bundle and owns extension discovery, manifests, directory listing, and file reads. Invar advertises the manifests through standard resource discovery as well. Refer to a linked sibling skill via its own catalog entry. The catalog is independent of workspace files and requires no workspace-supplied input. Resource size is bounded under the stdio frame limit.
 
 ## State, Ownership, and Lifecycle
 An actor owns bounded active tool calls and subscriptions under fixed limits. SDK stop/disconnect drains protocol I/O. Application shutdown detaches owned observations and closes its client session, without cancelling other observers' work.

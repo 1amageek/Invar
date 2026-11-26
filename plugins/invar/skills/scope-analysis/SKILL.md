@@ -15,7 +15,7 @@ Select only the phases needed. Reuse valid evidence supplied by the caller; reas
 4. [Change verification](references/change-verification.md): compare actual changes and evidence with the current baseline; check forward and reverse traceability.
 
 ## Integration
-Use the [shared contract](../../references/requirements-and-scope.md). Accept a Requirements Baseline or clearly authorized direct request, and a Scope Baseline for actual verification. Return Analysis Findings or Verification Findings. Do not call requirements-engineering or scope-management: return unresolved decisions to the caller.
+Use the [shared contract](../scope-management/references/requirements-and-scope.md). Accept a Requirements Baseline or clearly authorized direct request, and a Scope Baseline for actual verification. Return Analysis Findings or Verification Findings. Do not call requirements-engineering or scope-management: return unresolved decisions to the caller.
 
 When used independently, report findings without granting permission to edit. If evidence is incomplete, mark unknowns; no invented thresholds, requirements, test results or approvals. Investigation scope is not modification authority. Optimize for necessary and sufficient behavior, not minimum file count.
 

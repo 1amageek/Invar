@@ -8,10 +8,10 @@ Consider public APIs, data schemas and migrations, persistence, concurrency, sec
 
 ## Classify findings
 
-Use the six canonical classifications in [the shared contract](../../../references/requirements-and-scope.md); do not define alternative labels.
+Use the six canonical classifications in [the shared contract](../../scope-management/references/requirements-and-scope.md); do not define alternative labels.
 
 For each material impact record the affected entity, causal path, evidence, potential consequence, necessary response, and confidence. Distinguish an affected component from one that must be edited. Consider alternatives before recommending wider changes. Do not treat risk severity as automatic authorization.
 
 
 ## Handoff
-Use [the shared contract](../../../references/requirements-and-scope.md) for identifiers, classification, check status and baseline revisions. Return findings to the caller; do not authorize or apply changes.
+Use [the shared contract](../../scope-management/references/requirements-and-scope.md) for identifiers, classification, check status and baseline revisions. Return findings to the caller; do not authorize or apply changes.

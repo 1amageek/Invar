@@ -5,13 +5,13 @@ description: Establish missing requirements and architecture contracts for new o
 
 # Verify a project
 
-Own the complete verification flow and its final verdict. Work in the target repository and preserve its original requirements. AGENTS.md owns global development rules; this skill owns the project verification stages. Read the [manifest and evidence contract](../../references/project-verification.md) before producing or aggregating records.
+Own the complete verification flow and its final verdict. Work in the target repository and preserve its original requirements. AGENTS.md owns global development rules; this skill owns the project verification stages. Read the [manifest and evidence contract](references/project-verification.md) before producing or aggregating records.
 
 ## Establish and review the requirements and architecture
 
 Resolve the target workspace from cwd or the explicit workspace selection. Read applicable `SPEC.md` and `DESIGN.md` from cwd upward to the project root and inspect its root `ARCHITECTURE.dsl`. Fill gaps in the governing contracts before starting verification or changing production code in either a new or an existing project.
 
-Coordinate the bundled skills through the [requirements and scope contract](../../references/requirements-and-scope.md). Use [requirements-engineering](../requirements-engineering/SKILL.md) to define new or changed requirements and resolve material ambiguity. For clear existing requirements, use the governing specification or authorized request. Use [scope-analysis](../scope-analysis/SKILL.md) to identify the necessary changes, affected contracts, and verification boundary. Pass the requirements and analysis findings to [scope-management](../scope-management/SKILL.md) to establish the authorized scope. Keep the linked baseline references in the existing plan or requirements review and reuse the same IDs and current evidence across stages.
+Coordinate the bundled skills through the [requirements and scope contract](../scope-management/references/requirements-and-scope.md). Use [requirements-engineering](../requirements-engineering/SKILL.md) to define new or changed requirements and resolve material ambiguity. For clear existing requirements, use the governing specification or authorized request. Use [scope-analysis](../scope-analysis/SKILL.md) to identify the necessary changes, affected contracts, and verification boundary. Pass the requirements and analysis findings to [scope-management](../scope-management/SKILL.md) to establish the authorized scope. Keep the linked baseline references in the existing plan or requirements review and reuse the same IDs and current evidence across stages.
 
 If the governing `SPEC.md` is missing, write it in the owning scope using the user's requirements and available project decisions. For an existing project, inspect the implementation, tests, and configuration to identify current behavior and discrepancies with the intended behavior. Record unresolved requirements for review. Preserve existing contract IDs and define stable IDs, observable acceptance conditions, failure behavior, and assumptions for new requirements.
 
@@ -75,7 +75,7 @@ Continue while an authorized action can advance a required gate. Retry with chan
 
 Each passed formal claim needs an executed successful checker receipt, a named obligation and its exact checked input. Implementation/correspondence evidence also binds production sources and model artifacts. Translation output is generation evidence; it does not establish an implementation property. Regression evidence keeps its test scope. Hashes and origin links establish identity, not semantic correspondence. Unsupported source, missing properties, exhausted resources and absent translation validation stay incomplete.
 
-Store reviewed inputs and stage records in the target repository's Verification layout. Requirements-derived models remain separate from implementation-generated models. Use schema-2 manifests and receipts; [project_report.py](../../scripts/project_report.py) derives gates, production coverage, returnTo and the whole verdict. A review attests what was inspected. Checker receipts provide formal evidence.
+Store reviewed inputs and stage records in the target repository's Verification layout. Requirements-derived models remain separate from implementation-generated models. Use schema-2 manifests and receipts; [project_report.py](scripts/project_report.py) derives gates, production coverage, returnTo and the whole verdict. When using MCP, retrieve the helper with `resources/read` from this skill’s manifest, verify its digest, and save the exact bytes where the target project’s verification configuration references it. A review attests what was inspected. Checker receipts provide formal evidence.
 
 ## Execute and publish
 

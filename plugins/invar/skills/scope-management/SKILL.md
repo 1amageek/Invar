@@ -14,7 +14,7 @@ Own the Scope Baseline and execution control. Deliver authorized outcomes comple
 4. [Completion gate](references/completion-gate.md): consume scope-analysis verification findings, enforce required checks and report status.
 
 ## Integration
-Use the [shared contract](../../references/requirements-and-scope.md). Coordinate scope-analysis as the sole owner of technical boundary/impact/diff analysis. Obtain requirements-engineering results when requirements are ambiguous, new, or changed. Do not duplicate their procedures. A caller may dispatch skills directly or load their instructions in the same agent; no special runtime is assumed.
+Use the [shared contract](references/requirements-and-scope.md). Coordinate scope-analysis as the sole owner of technical boundary/impact/diff analysis. Obtain requirements-engineering results when requirements are ambiguous, new, or changed. Do not duplicate their procedures. A caller may dispatch skills directly or load their instructions in the same agent; no special runtime is assumed.
 
 If a required skill is unavailable, report the gap and perform only independently authorized work that can be justified; do not claim a completed analysis or gate without evidence. For read-only requests, do not modify software. Preserve existing user changes and unrelated contracts.
 

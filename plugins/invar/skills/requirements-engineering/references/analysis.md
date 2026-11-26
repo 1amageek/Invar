@@ -27,4 +27,4 @@ A coherent candidate requirement set, source links, dependencies, preserved cont
 
 
 ## Handoff
-Use [the shared contract](../../../references/requirements-and-scope.md). Record results in the Requirements Baseline or its proposed revision; report material unknowns without asserting authorization.
+Use [the shared contract](../../scope-management/references/requirements-and-scope.md). Record results in the Requirements Baseline or its proposed revision; report material unknowns without asserting authorization.

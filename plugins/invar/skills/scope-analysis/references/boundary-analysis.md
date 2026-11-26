@@ -28,4 +28,4 @@ Return this candidate boundary to the caller. Baseline control belongs to SM; ex
 
 
 ## Handoff
-Use [the shared contract](../../../references/requirements-and-scope.md) for identifiers, classification, check status and baseline revisions. Return findings to the caller; do not authorize or apply changes.
+Use [the shared contract](../../scope-management/references/requirements-and-scope.md) for identifiers, classification, check status and baseline revisions. Return findings to the caller; do not authorize or apply changes.

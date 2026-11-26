@@ -10,7 +10,9 @@ import unittest
 import subprocess
 import sys
 
-source = Path(__file__).resolve().parents[1] / 'plugins/invar/scripts/project_report.py'
+sys.dont_write_bytecode = True
+
+source = Path(__file__).resolve().parents[1] / 'plugins/invar/skills/verify-project/scripts/project_report.py'
 spec = importlib.util.spec_from_file_location('project_report', source)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)

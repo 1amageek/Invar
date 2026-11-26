@@ -16,13 +16,13 @@ The two TLA+ and Lean verification stages answer different questions. **Specific
 | **Implementation Model Verification** | Use swift-formal to generate a model from supported production code and run the applicable TLA+ or Lean checks for the named conditions. The result establishes the checked property within the generated model's stated scope. |
 | **Source-to-Model Validation** | Establish that the generated model preserves the relevant behavior of the exact source files. The current generated-model workflow reports this as `UNVALIDATED`. |
 
-Review each stage before proceeding. If a review finds a problem, return to the stage that owns it and repeat the affected checks and reviews. For an existing-code audit, Invar can retain downstream diagnostics while an earlier stage is incomplete. Whole-project success requires evidence for every required assessment, coverage of the declared production inputs, and all five stage reviews. Missing evidence keeps the report incomplete and identifies the stage to return to. [Project verification contract](plugins/invar/references/project-verification.md)
+Review each stage before proceeding. If a review finds a problem, return to the stage that owns it and repeat the affected checks and reviews. For an existing-code audit, Invar can retain downstream diagnostics while an earlier stage is incomplete. Whole-project success requires evidence for every required assessment, coverage of the declared production inputs, and all five stage reviews. Missing evidence keeps the report incomplete and identifies the stage to return to. [Project verification contract](plugins/invar/skills/verify-project/references/project-verification.md)
 
 For Swift projects, the agent runs deslop as part of implementation review before Implementation Model Verification. [Structural review](plugins/invar/skills/verify-project/SKILL.md#check-implementation-structure)
 
 ## Run verification from an agent
 
-The Invar plugin bundles eight skills and a stdio MCP server for Codex and Claude Code.
+Invar serves eight skills from its stdio MCP server using the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview). Connect to `invar mcp` from a project directory. An extension-aware client discovers skills with `skills/list`, looks up entries with `skills/get`, and reads their files using `resources/read`. Each manifest includes the byte sizes and SHA-256 digests of the skill and its supporting files. Clients with standard MCP Resources can also discover the entrypoints through `resources/list`. The Codex and Claude Code plugin packages the same skill files for hosts that use local skill discovery.
 
 | Skill | Use it to |
 |---|---|
@@ -110,7 +110,7 @@ invar status --workspace /path/to/target
 
 When updating an existing workspace, remove the old `approved` fields from its verification configuration. Stop the running daemon with its current binary before upgrading. After upgrading, start Invar and prepare a fresh plan from the current snapshot. Existing evidence stays in the local store.
 
-For development, run `swift build --product invar` from the Invar checkout. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v invar)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/invar`.
+For development, run `swift build --product invar` from the Invar checkout. The executable uses the adjacent SwiftPM bundles for Explorer and MCP skills. To prepare a workspace-specific plugin with an absolute path to a custom or Mint-installed binary, run `python3 Tools/prepare-plugin.py --workspace /path/to/target --binary "$(command -v invar)" --output /path/to/local-marketplace`. Omit `--binary` to use `.build/debug/invar`.
 
 ## Generate a Map from the CLI
 
