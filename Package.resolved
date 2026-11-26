@@ -1,5 +1,5 @@
 {
-  "originHash" : "b753a79ea2059cc5abeddf593a8b360a4540054cc3b82f5cc9eb62c850e3bd81",
+  "originHash" : "a48e378bfdc2f08818369fc4d379cbfcd471b885d1b7401cd43c4c4dc6198e6b",
   "pins" : [
     {
       "identity" : "architectureexplorer",
@@ -267,7 +267,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/swift-sdk.git",
       "state" : {
-        "revision" : "88f89d5c1930c551b0f91961b8a7af5af10f6d6d"
+        "revision" : "9f3832f597ca77f618cfa97ebe6b646e11cf5de2",
+        "version" : "0.15.0"
       }
     },
     {

@@ -15,7 +15,7 @@ def manifest(path):
 try:
  current=manifest(ROOT); assert current['name']=='Invar'
  assert {p['name'] for p in current['products']}=={'VerificationCore','VerificationDiscovery','VerificationPlanner','VerificationStore','VerificationExplorer','VerificationBackends','VerificationRuntime','VerificationClient','VerificationDaemon','VerificationFormal','invar'}
- expected={'architectureexplorer':('ArchitectureExplorer','0.1.4'),'swift-formal':('swift-formal','0.1.1'),'swift-sdk':('swift-sdk','88f89d5c1930c551b0f91961b8a7af5af10f6d6d')}
+ expected={'architectureexplorer':('ArchitectureExplorer','0.1.4'),'swift-formal':('swift-formal','0.1.1'),'swift-sdk':('swift-sdk','0.15.0')}
  dependencies={}
  pins={pin['identity']:pin for pin in json.loads((ROOT/'Package.resolved').read_text())['pins']}
  for entry in current['dependencies']:
@@ -25,14 +25,8 @@ try:
   location=dependency['location']['remote'][0]['urlString']
   repository,expected_version=expected[identity]
   assert location==f'https://github.com/1amageek/{repository}.git'
-  pin=pins[identity]
-  assert pin['location']==location
-  if identity=='swift-sdk':
-   version,=dependency['requirement']['revision']
-   assert pin['state']=={'revision':version} and version==expected_version
-  else:
-   version,=dependency['requirement']['exact']
-   assert pin['state']['version']==version==expected_version
+  version,=dependency['requirement']['exact']
+  assert pins[identity]['location']==location and pins[identity]['state']['version']==version==expected_version
   dependencies[identity]=version
  assert dependencies.keys()==expected.keys()
  designs=[p for p in ROOT.rglob('DESIGN.md') if not any(part == '.git' or part.startswith('.build') for part in p.parts)]
