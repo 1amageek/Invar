@@ -6,7 +6,7 @@ Execute a reviewed whole-project workflow over sealed repository inputs and reta
 
 ## Responsibilities and Boundaries
 
-ProjectBackend copies each captured input to an attempt-owned workspace. It runs the declared argv in a bounded isolated process session and checks the configured tool and report-builder digests before and after execution. The workflow and report builder each receive an attempt-scoped macOS sandbox. Host I/O is limited to installed runtime resources and configured tool files. The workflow writes its private copy. The builder reads that copy and writes validation output in a separate directory. Nested tools must direct their temporary files to the attempt. This includes Java runtimes used to run TLA+ checkers.
+ProjectBackend copies each captured input to an attempt-owned workspace. It runs the declared argv in a bounded isolated process session and checks the configured tool and report-builder digests before and after execution. The workflow and report builder each receive an attempt-scoped macOS sandbox. Host I/O is limited to installed runtime resources and configured tool files. The workflow writes its private copy. The builder reads that copy and writes validation output in a separate directory. Nested tools must direct their temporary files to the attempt. For Java-based TLA+ checkers the sandbox also grants read access to the configured JDK configuration directory, which Java uses to initialize its security providers.
 
 ## Related Designs
 

@@ -21,7 +21,7 @@ For a project gate, configure the actual checker commands, expected named obliga
 
 Reuse the repository's location for design verification. Otherwise keep the reviewed `.tla`, `.cfg` and `.lean` inputs in `Verification/Specifications/<subject>/`. Cite the requirement in the model next to its named property or theorem. Keep checker scratch files in a fresh temporary directory for each run. Use the repository's pinned toolchain or the corresponding binaries from a locally verified swift-formal distribution. Record tool identities, exact commands, input revisions or digests, and an explicit time budget. If a required tool or input is unavailable, mark its obligation unexecuted.
 
-**TLA+.** Define the initial states and allowed transitions independently of the property being tested. Configure TLC with the intended specification, finite constants, and each named `INVARIANT` or temporal `PROPERTY`. Justify model bounds, termination, deadlock policy and any fairness or pruning assumptions. Run the actual checker with a deadline:
+**TLA+.** For Invar’s network-isolated project runner, pin a TLC build that can run locally without opening a listener, such as TLA+ Tools 1.8.0. Treat a checker startup failure as unexecuted. Define the initial states and allowed transitions independently of the property being tested. Configure TLC with the intended specification, finite constants, and each named `INVARIANT` or temporal `PROPERTY`. Justify model bounds, termination, deadlock policy and any fairness or pruning assumptions. Run the actual checker with a deadline:
 
 ```sh
 timeout "$seconds" "$java" -Djava.io.tmpdir="$scratch" -cp "$tla_jar" tlc2.TLC -workers 1 -metadir "$scratch/states" -config "$config" "$module"

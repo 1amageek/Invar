@@ -46,9 +46,12 @@ struct ProjectSandbox {
             // The JVM uses libinfo to initialize the current user even during an offline check.
             policy += "(allow mach-lookup (global-name \"com.apple.system.opendirectoryd.libinfo\"))\n"
         }
+        let javaConfigurations = Set(installedTools.filter {
+            $0.lastPathComponent == "java" && $0.deletingLastPathComponent().lastPathComponent == "bin"
+        }.map { $0.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("conf").path })
         var ancestors = Set<String>()
         let directories = Set(toolDirectories + system + [attempt])
-        for root in directories.union(installedTools.map(\.path)) {
+        for root in directories.union(javaConfigurations).union(installedTools.map(\.path)) {
             var parent = URL(fileURLWithPath: root).deletingLastPathComponent()
             while parent.path != "/" {
                 ancestors.insert(parent.path)
@@ -57,6 +60,9 @@ struct ProjectSandbox {
         }
         for root in directories.sorted() {
             policy += "(allow file-read* file-map-executable (subpath \(try literal(root))))\n"
+        }
+        for path in javaConfigurations.sorted() {
+            policy += "(allow file-read* (subpath \(try literal(path))))\n"
         }
         for path in ancestors.sorted() { policy += "(allow file-read* (literal \(try literal(path))))\n" }
         for tool in installedTools {
