@@ -31,7 +31,7 @@ The verification daemon serves the local OS user through private Unix sockets. R
 
 | ID | Requirement |
 |---|---|
-| WG01 | verify-project owns whole-project orchestration. verify-spec and formal-verification own their assigned stages and do not duplicate or recursively restart the project workflow. Global development rules are owned by AGENTS.md. |
+| WG01 | verify-project owns whole-project orchestration. Each other skill handles its assigned task and returns missing inputs or findings to the caller. Only verify-project routes between skills during the project workflow. Skills may depend on necessary artifacts and shared resource contracts. Global development rules are owned by AGENTS.md. |
 | WG02 | Schema-2 project manifests retain the complete acceptance inventory, declared production inputs, checker receipts and stage reviews. The ordered stages are requirements, specification, implementation, correspondence and integration. Each gate needs its evidence and current review; a later observation cannot pass an earlier gate. |
 | WG03 | A passed formal claim names an executed successful checker activity, its method and a nonempty named obligation bound to a checked input. Implementation and correspondence claims additionally bind exact production sources and model artifacts. Generation and regression records cannot supply a passed formal assessment. |
 | WG04 | Implementation completion covers the entire declared production input inventory. Correspondence binds the same source/model inputs as implementation checking for each requirement. Hash identity alone does not establish semantic correspondence or certify a producer. |

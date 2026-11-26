@@ -69,6 +69,8 @@ def verify_skills(request):
     expected = {f'skill://invar/{file.relative_to(source).as_posix()}'
                 for file in source.rglob('*') if file.is_file()}
     assert set(contents) == expected
+    orchestration = 'verify-project'
+    delegated = set()
     for uri, data in contents.items():
         if not uri.endswith('.md'):
             continue
@@ -79,6 +81,13 @@ def verify_skills(request):
                 continue
             path = posixpath.normpath(posixpath.join(posixpath.dirname(origin.path), target.path))
             assert urlunsplit((origin.scheme, origin.netloc, path, '', '')) in contents, (uri, link)
+            owner = origin.path.split('/')[1]
+            destination = path.split('/')[1]
+            if owner != destination and path.endswith('/SKILL.md'):
+                assert owner == orchestration, (uri, link)
+                delegated.add(urlunsplit((origin.scheme, origin.netloc, path, '', '')))
+    assert delegated == entrypoints - {'skill://invar/verify-project/SKILL.md'}
+
 
     with tempfile.TemporaryDirectory(prefix='invar-skill-helper-') as temporary:
         helper = Path(temporary) / 'project_report.py'
@@ -127,7 +136,8 @@ def mcp_status(argv, cwd, protocol='2025-11-25', *, check_skills=False):
             initialized = request('initialize', protocolVersion=protocol, capabilities={}, clientInfo=client_info)
             request('notifications/initialized', notification=True)
             assert initialized['serverInfo']['name'] == 'Invar', initialized
-        assert 'skill://invar/use-invar/SKILL.md' in initialized['instructions']
+        assert all(uri in initialized['instructions'] for uri in (
+            'skill://invar/use-invar/SKILL.md', 'skill://invar/verify-project/SKILL.md'))
         capability = initialized['capabilities']
         assert 'resources' in capability
         assert capability['extensions']['io.modelcontextprotocol/skills'] == {'directoryRead': True}

@@ -1,13 +1,13 @@
 ---
 name: verify-spec
-description: Run Specification Verification on scoped contracts from SPEC.md using TLA+ and Lean. Use before implementation or for the specification stage of verify-project, including projects without source code or an Explorer snapshot.
+description: Run Specification Verification on scoped contracts from SPEC.md using TLA+ and Lean. Use before implementation or for a project specification stage, including projects without source code or an Explorer snapshot.
 ---
 
 # Specification Verification
 
 Derive obligations from the applicable `SPEC.md` and execute the relevant checkers. Work in the target repository. Keep the requirements-derived models separate from artifacts translated from implementation.
 
-Whole-project orchestration belongs to [verify-project](../verify-project/SKILL.md). When assigned its specification stage, execute only that stage and return scoped receipts, review findings and uncovered conditions to the orchestrator. A directly requested design check does not require implementation or publication. User-requested condition definition remains a definition-only operation.
+For a project specification stage, return scoped receipts, review findings and uncovered conditions to the caller. A directly requested design check does not require implementation or publication. When asked to author or review the formal obligations, save the models and report their pending checker inputs to the caller. Execute checkers when assigned the verification step.
 
 ## Establish the contract
 
@@ -41,4 +41,4 @@ For a Lake project use its existing `lake env lean` invocation. Inspect the chec
 
 For each requirement, give the formal statement, its correspondence to the original wording, assumptions, input paths, checker evidence, and uncovered cases. Keep a concise reproducible result alongside the specifications or in the repository's existing verification record. When an input changes, rerun the affected obligations. Review a nontrivial model for vacuity: confirm a meaningful operation is reachable or a relevant premise can hold, and exercise a violating case when it distinguishes a real guarantee from a tautology.
 
-Report bounded TLC success, Lean proof, counterexample, and incomplete execution separately. Return a wrong requirement to requirements and an incorrect or incomplete formalization to specification. Preserve the original requirement when diagnosing implementation failures. In a project workflow, record the bound stage review using the [evidence contract](../verify-project/references/project-verification.md). Source-to-Model Validation and project completion remain the orchestrator's responsibility.
+Report bounded TLC success, Lean proof, counterexample, and incomplete execution separately. Return a wrong requirement to requirements and an incorrect or incomplete formalization to specification. Preserve the original requirement when diagnosing implementation failures. In a project workflow, record the bound stage review using the [evidence contract](../verify-project/references/project-verification.md). Include the exact checked inputs so the caller can reuse the result.

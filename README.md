@@ -26,7 +26,7 @@ Invar serves nine skills from its stdio MCP server using the [MCP Skills extensi
 
 | Skill | Use it to |
 |---|---|
-| `use-invar` | Start with Invar and prepare missing project inputs before verification. [Use Invar](Sources/InvarSkills/skills/use-invar/SKILL.md) |
+| `use-invar` | Inspect workspace readiness, repair execution configuration and check that project inputs link in Explorer. [Use Invar](Sources/InvarSkills/skills/use-invar/SKILL.md) |
 | `verify-project` | Review the complete requirements inventory, run the verification stages, and publish the whole-project report. [Verify Project](Sources/InvarSkills/skills/verify-project/SKILL.md) |
 | `requirements-engineering` | Establish verifiable requirements and acceptance criteria. [Requirements Engineering](Sources/InvarSkills/skills/requirements-engineering/SKILL.md) |
 | `scope-analysis` | Analyze change boundaries and impact, then review the final diff against the requirements. [Scope Analysis](Sources/InvarSkills/skills/scope-analysis/SKILL.md) |
@@ -95,7 +95,7 @@ codex mcp add invar -- /absolute/path/to/invar mcp
 claude mcp add --scope user --transport stdio invar -- /absolute/path/to/invar mcp
 ```
 
-Open the target repository as the agent's working directory and ask it to use Invar. The MCP server directs it to `use-invar` for first use and preparation. Projects may also add the following verification reminder to `AGENTS.md`.
+Open the target repository as the agent's working directory and ask it to use Invar. The MCP server directs it to `use-invar` for setup and `verify-project` for project-wide preparation and verification. Projects may also add the following verification reminder to `AGENTS.md`.
 
 ```markdown
 ## Project verification

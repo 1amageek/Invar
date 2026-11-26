@@ -5,7 +5,7 @@ description: Author or review snapshot-linked interaction scenarios in the repos
 
 # Generate sequences
 
-Work from the requested scope. Read the governing SPEC.md and any applicable design, then read the root ARCHITECTURE.dsl. If the architecture is missing or has a genuine missing participant or connection, use [generate-architecture](../generate-architecture/SKILL.md) to establish or reconcile the shared model. Preserve reviewed declarations and stable IDs across edits.
+Work from the requested scope. Read the governing SPEC.md and any applicable design, then read the root ARCHITECTURE.dsl. If the base architecture, a participant, or a connection is missing, report the exact missing declaration and stop the affected scenario until its owner supplies it. Preserve reviewed declarations and stable IDs across edits.
 
 Select user-visible or operationally significant scenarios from the requirements. Trace the actual production entry points, request or event path, dependency calls, owner of state changes, replies, and error handling. Read relevant tests and configuration. Keep distinct outcomes in distinct views and split them where their preconditions or results differ. Record unimplemented flows as planned in the view title and cite their specification. Keep observations and formal results with their original evidence.
 

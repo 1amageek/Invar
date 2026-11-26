@@ -1,11 +1,19 @@
 ---
 name: formal-verification
-description: Check scoped production-derived models with swift-formal or a reviewed manual model and Invar. Use for implementation-model checks, node Verify model requests, or the implementation stage of verify-project. Record model scope, source correspondence and publication evidence.
+description: Check scoped production-derived models with swift-formal or a reviewed manual model and Invar. Use for implementation-model checks, node Verify model requests, or a project implementation stage. Record model scope, source correspondence and publication evidence.
 ---
 
 # Implementation Model Verification
 
-Whole-project orchestration belongs to [verify-project](../verify-project/SKILL.md). When assigned its implementation stage, use the reviewed requirements and independent conditions to check production-derived models. Return receipts, coverage and findings to the orchestrator. Record model generation, regressions and Source-to-Model Validation under their respective evidence domains. Use the [schema-2 evidence contract](../verify-project/references/project-verification.md) for project receipts and stage reviews.
+Use the reviewed requirements and independent conditions for the supplied scope. Return receipts, coverage and gaps to the caller. Use the [schema-2 evidence contract](../verify-project/references/project-verification.md) for project records.
+
+| Assigned work | Start and return |
+|---|---|
+| Define conditions | Save named obligations and reviewed inputs. Return their locations and assumptions. |
+| Verify the implementation model | Check the named obligations on the scoped production-derived model. Return checker evidence and exact source/model identities. |
+| Validate correspondence | Use the supplied source/model identities and checker evidence. Run the correspondence work below on those exact bytes. Return validated correspondence or the uncovered behavior. |
+
+Record model generation, regression tests and Source-to-Model Validation under their respective evidence domains.
 
 Read the selected node and its callers, dependencies, tests and design at the requested snapshot. For a browser annotation, read every page of `read_verification_request` in its originating thread and check workspace, snapshot and entity identity. If the request expired, obtain a fresh selection. Identify the production decision that owns the property, its inputs, the intended result and what the property leaves outside scope.
 
@@ -24,11 +32,11 @@ For a stateful or concurrent obligation, map relevant request orderings, retries
 
 ## Check source correspondence
 
-Trace the checked transitions through the captured production entry, its concrete implementation and the relevant runtime contracts. Exercise the actual affected path where possible. Record which transitions the test observed and which rely on a stated platform assumption or remain untested. Source review and runtime comparisons support the scope they establish. Claim passed Source-to-Model Validation only when semantic correspondence for the stated obligation is established for the same exact source and model inputs. Leave the correspondence assessment incomplete with the remaining gap when the evidence covers only samples or selected branches.
+In correspondence mode, begin here with the recorded model check and its source/model inputs. Report missing or stale evidence to the caller. Trace the checked transitions through the captured production entry, its concrete implementation and the relevant runtime contracts. Exercise the actual affected path where possible. Record which transitions the test observed and which rely on a stated platform assumption or remain untested. Source review and runtime comparisons support the scope they establish. Claim passed Source-to-Model Validation only when semantic correspondence for the stated obligation is established for the same exact source and model inputs. Leave the correspondence assessment incomplete with the remaining gap when the evidence covers only samples or selected branches.
 
 ## Execute and publish against the selected snapshot
 
-Use the configured workspace daemon and obtain the indexed snapshot containing the exact captured inputs. When adding verification artifacts creates a new snapshot, resolve the original subject there, compare the relevant source and obligation, and report the new snapshot. Request a fresh selection if the subject or property changed. An archived snapshot can support scoped diagnostics when live capture fails. Record which snapshot was used and keep the live result and publication pending until their input binding is verified.
+For an assigned check, submit the configured activity for that scope. Use the configured workspace daemon and obtain the indexed snapshot containing the exact captured inputs. When adding verification artifacts creates a new snapshot, resolve the original subject there, compare the relevant source and obligation, and report the new snapshot. Request a fresh selection if the subject or property changed. An archived snapshot can support scoped diagnostics when live capture fails. Record which snapshot was used and keep the live result and publication pending until their input binding is verified.
 
 1. Submit `invar_plan` with the configuration path and a stable request key. Poll `invar_operation` to terminal state and read `invar_plan_info`. Match its workspace and snapshot to the selected target.
 2. Submit `invar_run` with that plan ID, snapshot ID, entity ID and a distinct stable key. Poll its original operation. Retrieve `invar_report` and `invar_publication`; on disconnect reconcile the original operation.

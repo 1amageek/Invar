@@ -11,9 +11,9 @@ Use the existing approved specification as the baseline where available. Track s
 ## Change procedure
 
 1. Identify the requested change and its authority. Distinguish requirement clarification, correction, addition, modification, removal, and implementation-only change.
-2. Compare the proposal against the current baseline. Identify affected requirements and semantic contracts; request technical impact findings for consumers, artifacts, formal models, and tests from scope-analysis.
+2. Compare the proposal against the current baseline. Identify affected requirements and semantic contracts; identify any missing impact findings for consumers, artifacts, formal models and tests.
 3. Analyze semantic conflicts and acceptance changes; consume SA findings for compatibility, migration and operational impact.
-4. Return the proposed requirement revision to the caller; request technical impact findings from `scope-analysis` and let `scope-management` control the work boundary. Obtain explicit approval for material changes not already authorized. Necessary implementation changes do not automatically require a requirement revision.
+4. Return the proposed requirement revision to the caller; include missing impact findings and any work boundary that requires a separate decision. Obtain explicit approval for material changes not already authorized. Necessary implementation changes do not automatically require a requirement revision.
 5. Update the specification and related artifacts consistently once authorized. Preserve identifiers and history; mark superseded requirements instead of silently repurposing IDs.
 6. Revalidate affected requirements and reverify affected implementation when applicable. Record actual evidence and remaining uncertainty.
 
