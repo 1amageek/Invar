@@ -57,7 +57,7 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@0.1.5 invar
+mint install 1amageek/Invar@0.1.6 invar
 invar
 ```
 
@@ -86,7 +86,7 @@ Run the new `invar` in that workspace after installation. The new pair registers
 
 ## Connect an agent to Invar MCP
 
-MCP skill distribution is available from the current checkout. From this checkout, run `swift build --product invar` and use the absolute path to `.build/debug/invar` for the commands below. With an installed build that includes MCP skills, use `command -v invar` to get its path. The executable and its adjacent SwiftPM bundles supply both Explorer and the skills.
+Invar 0.1.6 serves its bundled skills through MCP. Run `command -v invar` to get the installed executable path for the commands below. For a source checkout, run `swift build --product invar` and use the absolute path to `.build/debug/invar`. The executable and its adjacent SwiftPM bundles supply Explorer and the skills.
 
 Register the executable once in your agent.
 
