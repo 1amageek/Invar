@@ -42,6 +42,8 @@ Each review reference identifies a JSON record with schemaVersion=1, stage, requ
 
 inputs binds the exact evidence inspected. All stages include the governing inventory source and governingDocuments. Specification includes its relevant checker receipts. Implementation includes productionInputs and its relevant receipts. Correspondence includes productionInputs and both implementation/correspondence receipts. Integration includes productionInputs, every checker receipt and all lower-stage review references. Hash binding makes later edits invalidate the review. Missing basis or review coverage makes the gate incomplete.
 
+For the implementation stage, retain the code review's comparison, inspected inputs, coverage, checks, verdict and findings as supporting review evidence. Bind its record and any retained check outputs used for the decision in `inputs`. A blocking defect maps to `changesRequested` and the owning return stage. A material verification gap maps to `incomplete`. A supported review with no blocking findings can contribute to `passed` after the applicable formal assessments and other implementation prerequisites pass. Retain advisories in the supporting review evidence. Reuse the implementation review in integration only while its comparison, reviewed inputs and relevant assumptions still match.
+
 A passed review has no findings. changesRequested has at least one finding containing requirementID, returnTo and reason. The return owner must be the reviewed stage or an earlier stage. A requested revision invalidates that owning gate and blocks its dependent gates. A review is an Agent attestation over recorded inputs. Formal claims require checker receipts.
 
 ## Derived report and completion

@@ -43,8 +43,8 @@ def invoke(argv, cwd, expected=0):
 def verify_skills(request):
     source = Path(__file__).resolve().parents[1] / 'Sources/InvarSkills/skills'
     entrypoints = {f'skill://invar/{file.relative_to(source).as_posix()}' for file in source.glob('*/SKILL.md')}
-    assert len(entrypoints) == 9
-    assert 'skill://invar/use-invar/SKILL.md' in entrypoints
+    assert len(entrypoints) == 10
+    assert {'skill://invar/use-invar/SKILL.md', 'skill://invar/code-review/SKILL.md'} <= entrypoints
     listed = request('skills/list')['skills']
     assert {skill['uri'] for skill in listed} == entrypoints
     assert {item['uri'] for item in request('resources/list')['resources']} == entrypoints
