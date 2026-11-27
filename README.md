@@ -18,7 +18,7 @@ The two TLA+ and Lean verification stages answer different questions. **Specific
 
 Review each stage before proceeding. If a review finds a problem, return to the stage that owns it and repeat the affected checks and reviews. For an existing-code audit, Invar can retain downstream diagnostics while an earlier stage is incomplete. Whole-project success requires evidence for every required assessment, coverage of the declared production inputs, and all five stage reviews. Missing evidence keeps the report incomplete and identifies the stage to return to. [Project verification contract](Sources/InvarSkills/skills/verify-project/references/project-verification.md)
 
-For Swift projects, the agent runs deslop for structural checks. The current workflow uses code-review to check affected behavior after structural checks and tests, before Implementation Model Verification. [Implementation review](Sources/InvarSkills/skills/verify-project/SKILL.md#review-the-implementation-behavior)
+For Swift projects, the agent runs deslop for structural checks. The workflow uses code-review to check affected behavior after structural checks and tests, before Implementation Model Verification. [Implementation review](Sources/InvarSkills/skills/verify-project/SKILL.md#review-the-implementation-behavior)
 
 ## Run verification from an agent
 
@@ -31,7 +31,7 @@ Invar serves bundled skills from its stdio MCP server using the [MCP Skills exte
 | `requirements-engineering` | Establish verifiable requirements and acceptance criteria. [Requirements Engineering](Sources/InvarSkills/skills/requirements-engineering/SKILL.md) |
 | `scope-analysis` | Analyze change boundaries and impact, then review the final diff against the requirements. [Scope Analysis](Sources/InvarSkills/skills/scope-analysis/SKILL.md) |
 | `scope-management` | Maintain the authorized scope and judge completion from current evidence. [Scope Management](Sources/InvarSkills/skills/scope-management/SKILL.md) |
-| `code-review` | Review affected behavior, downstream consumers and verification gaps. Available in the current checkout. [Code Review](Sources/InvarSkills/skills/code-review/SKILL.md) |
+| `code-review` | Review affected behavior, downstream consumers and verification gaps. [Code Review](Sources/InvarSkills/skills/code-review/SKILL.md) |
 | `verify-spec` | Run scoped **Specification Verification**. Keep authored TLA+ and Lean models under `Verification/Specifications/<subject>/`. [Specification Verification](Sources/InvarSkills/skills/verify-spec/SKILL.md) |
 | `formal-verification` | Run scoped **Implementation Model Verification**. Keep node-level preconditions and expected results in `Verification/<subject>/properties.json`. [Implementation Model Verification](Sources/InvarSkills/skills/formal-verification/SKILL.md) |
 | `generate-architecture` | Inspect requirements, implementation, and configuration to build or update `ARCHITECTURE.dsl` for Explorer's C1 and C2 Map. [Generate Architecture](Sources/InvarSkills/skills/generate-architecture/SKILL.md) |
@@ -58,7 +58,7 @@ An execution can finish and publish an incomplete report. Check the verdict sepa
 Use macOS 27 or later on Apple Silicon, Swift 6.4.1, and [Mint](https://github.com/yonaskolb/Mint). Add Mint's bin directory (default: `~/.mint/bin`) to your `PATH`.
 
 ```sh
-mint install 1amageek/Invar@0.1.6 invar
+mint install 1amageek/Invar@0.1.7 invar
 invar
 ```
 
@@ -87,7 +87,7 @@ Run the new `invar` in that workspace after installation. The new pair registers
 
 ## Connect an agent to Invar MCP
 
-Invar 0.1.6 serves its bundled skills through MCP. Run `command -v invar` to get the installed executable path for the commands below. For a source checkout, run `swift build --product invar` and use the absolute path to `.build/debug/invar`. The executable and its adjacent SwiftPM bundles supply Explorer and the skills.
+Invar 0.1.7 serves its bundled skills through MCP. Run `command -v invar` to get the installed executable path for the commands below. For a source checkout, run `swift build --product invar` and use the absolute path to `.build/debug/invar`. The executable and its adjacent SwiftPM bundles supply Explorer and the skills.
 
 Register the executable once in your agent.
 
