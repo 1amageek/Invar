@@ -46,6 +46,12 @@ For the implementation stage, retain the code review's comparison, inspected inp
 
 A passed review has no findings. changesRequested has at least one finding containing requirementID, returnTo and reason. The return owner must be the reviewed stage or an earlier stage. A requested revision invalidates that owning gate and blocks its dependent gates. A review is an Agent attestation over recorded inputs. Formal claims require checker receipts.
 
+## Evidence reuse after revisions
+
+Compare the actual evidence closure with the next captured inputs. Include the governing requirement, relevant production files and dependencies, harness or model, configuration, tool and applicable execution assumptions. When the closure or coverage is uncertain, recheck the affected claim. A change outside the closure can preserve the original evidence. Reuse the original bytes and path/digest references, including checker receipts and supporting outputs. Preserve their original execution context in the new review.
+
+Bind new or recomposed stage reviews to all evidence required by the current manifest. An implementation, correspondence or integration review that binds the entire production inventory must be refreshed when that inventory changes. Carry forward its unaffected scoped evidence and update the affected observations and final review decision. The report builder rejects a retained reference with changed bytes. A focused review or a user preview can inform progress. A required check awaiting execution still lacks the evidence needed for a passed stage review.
+
 ## Derived report and completion
 
 project_report.py independently validates references, producer activities, named obligations, production/model binding and review basis. It derives the five gates from evidence and accepted reviews. Earlier incomplete gates block later gate passage while preserving their observations. Missing data is incomplete; explicit failed obligations take precedence. The earliest unmet or revision owner is workflow.returnTo.

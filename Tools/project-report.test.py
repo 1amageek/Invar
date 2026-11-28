@@ -78,6 +78,79 @@ class ProjectReportTests(unittest.TestCase):
         self.assertEqual(value['outcome'], 'passed')
         self.assertTrue(all(row[phase]['outcome'] == 'passed' for row in value['requirements'] for phase in module.PHASES))
 
+    def test_deferred_implementation_resumes_with_unaffected_receipts(self):
+        stable_source = self.write('Stable.swift', 'func stable() -> Bool { true }')
+        stable_model = self.write('stable-model.json', '{"model":"stable"}')
+        spec_receipt = self.receipts['specification']
+        spec_receipt['inputs'] = [self.specification, self.obligation]
+        spec_reference = self.save_receipt()
+        review_references = [
+            self.write(stage + '-review.json', json.dumps({
+                'schemaVersion': 1, 'stage': stage, 'requirements': ['R01', 'R02'],
+                'decision': 'passed', 'summary': 'Reviewed independent contracts',
+                'inputs': [self.specification, reference], 'findings': [],
+            }))
+            for stage, reference in [('requirements', self.architecture), ('specification', spec_reference)]
+        ]
+
+        def record_component(identity, source, model):
+            references = []
+            row = next(row for row in self.manifest['requirements'] if row['id'] == identity)
+            for phase in ('implementation', 'correspondence'):
+                receipt = copy.deepcopy(self.receipts[phase])
+                claim = next(claim for claim in receipt['claims'] if identity in claim['requirements'])
+                claim.update(sourceInputs=[source], modelInputs=[model])
+                receipt.update(claims=[claim], inputs=[self.specification, self.obligation, source, model])
+                references.append(self.write(f'{phase}-{identity}.json', json.dumps(receipt)))
+                row[phase] = {'claims': [claim['id']]}
+            return references
+
+        affected = record_component('R01', self.source, self.model)
+        unchanged = record_component('R02', stable_source, stable_model)
+        self.manifest.update(productionInputs=[self.source, stable_source], receipts=[spec_reference, *affected, *unchanged],
+                             reviews=review_references.copy())
+        for stage in ('implementation', 'correspondence', 'integration'):
+            is_implementation = stage == 'implementation'
+            self.manifest['reviews'].append(self.write(stage + '-review.json', json.dumps({
+                'schemaVersion': 1, 'stage': stage, 'requirements': ['R01', 'R02'],
+                'decision': 'changesRequested' if is_implementation else 'passed',
+                'summary': 'Fix the affected source' if is_implementation else 'Reviewed available evidence',
+                'inputs': [self.specification, self.architecture, *self.manifest['productionInputs'],
+                           *self.manifest['receipts'], *self.manifest['reviews']],
+                'findings': [{'requirementID': 'R01', 'returnTo': 'implementation', 'reason': 'Behavior review found a defect'}]
+                            if is_implementation else [],
+            })))
+        self.assertEqual(self.build()['workflow']['returnTo'], 'implementation')
+
+        revised_source = self.write('Code.swift', 'func value() -> Bool { 1 == 1 }')
+        self.manifest['productionInputs'] = [revised_source, stable_source]
+        with self.assertRaisesRegex(ValueError, 'Changed evidence input: Code.swift'):
+            self.build()
+
+        self.manifest.update(receipts=[spec_reference, *unchanged], reviews=review_references.copy())
+        for phase in ('implementation', 'correspondence'):
+            self.manifest['requirements'][0][phase] = {'claims': [], 'reason': 'Deferred until the component is ready'}
+        deferred = self.build()['workflow']
+        self.assertEqual(deferred['outcome'], 'incomplete')
+        self.assertEqual(deferred['returnTo'], 'implementation')
+        self.assertEqual(deferred['coveredProductionInputCount'], 1)
+        self.assertEqual([stage['status'] for stage in deferred['stages']],
+                         ['passed', 'passed', 'incomplete', 'blocked', 'blocked'])
+
+        current_model = self.write('model.json', '{"model":"revised"}')
+        self.manifest['receipts'].extend(record_component('R01', revised_source, current_model))
+        for stage in ('implementation', 'correspondence', 'integration'):
+            self.manifest['reviews'].append(self.write(stage + '-review.json', json.dumps({
+                'schemaVersion': 1, 'stage': stage, 'requirements': ['R01', 'R02'],
+                'decision': 'passed', 'summary': 'Reviewed fixed inputs and retained evidence',
+                'inputs': [self.specification, self.architecture, *self.manifest['productionInputs'],
+                           *self.manifest['receipts'], *self.manifest['reviews']], 'findings': [],
+            })))
+        current = self.build()['workflow']
+        self.assertEqual(current['outcome'], 'passed')
+        self.assertIsNone(current['returnTo'])
+        self.assertEqual(current['coveredProductionInputCount'], 2)
+
     def test_missing_stage_reviews_cannot_pass(self):
         self.manifest['reviews'] = []
         result = self.build()
