@@ -16,6 +16,7 @@ Every record has `id`, `revision`, `source_refs`, and relevant input baseline ID
 
 **Requirements Baseline (RE or direct-request adapter)**
 - `requirements[]`: `id`, `outcome`, `source_refs`, `status` (proposed | authorized | superseded), `constraints[]`, `acceptance_criteria[]` (stable IDs, observable condition, planned method), `authorization_ref` (required for authorized), `open_questions[]`.
+- `intent[]`: per `requirementID`, record the selected behavior, rationale and authority locator. Retain a pending question and its differing observable outcomes until the decision is resolved.
 - `preserved_contracts[]`: ID, obligation, source. Existing behavior alone is evidence, not automatically a contract.
 - `task_mode`: investigate | explain | plan | implement | review | specify (or explicitly authorized combination).
 - `validation_findings[]`: semantic validation, unresolved issues. Authorization and validation are separate.

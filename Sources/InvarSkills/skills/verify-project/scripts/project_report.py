@@ -118,6 +118,46 @@ def checked_claim(root, claim, receipt, production):
             raise ValueError('Passed claim lacks exact production-source/model bindings')
 
 
+def review_intent(review):
+    entries = review.get('intent', [])
+    if not isinstance(entries, list):
+        raise ValueError('Invalid requirements intent')
+    seen = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get('requirementID') not in review['requirements'] or entry['requirementID'] in seen:
+            raise ValueError('Intent must identify a unique reviewed requirement')
+        if entry.get('basis') not in ('request', 'existingSpecification', 'userDecision', 'pending') or not all(
+            isinstance(entry.get(field), str) and entry[field].strip() for field in ('decision', 'rationale', 'source')
+        ):
+            raise ValueError('Intent lacks its decision, rationale or source')
+        seen.add(entry['requirementID'])
+    return {entry['requirementID'] for entry in entries if entry['basis'] != 'pending'} == set(review['requirements'])
+
+
+def user_acceptance(root, manifest, reviews):
+    reference = manifest.get('userAcceptance')
+    if reference is None:
+        return {'status': 'notRecorded'}
+    reference_set(root, [reference])
+    record = json.loads(read(root, reference))
+    if (record.get('schemaVersion') != 1 or record.get('decision') not in ('accepted', 'changesRequested')
+            or not all(isinstance(record.get(field), str) and record[field].strip() for field in ('source', 'summary'))):
+        raise ValueError('User acceptance requires an explicit decision and source')
+    bound = record.get('integrationReviews')
+    if not isinstance(bound, list) or not all(
+        isinstance(item, dict) and set(item) == {'path', 'sha256'} and all(isinstance(v, str) for v in item.values())
+        for item in bound
+    ):
+        raise ValueError('Invalid user acceptance review references')
+    current = {key(review['reference']) for review in reviews if review['stage'] == 'integration'}
+    review_keys = {key(item) for item in bound}
+    if len(review_keys) != len(bound):
+        raise ValueError('Duplicate user acceptance review reference')
+    if not current or review_keys != current:
+        return {'status': 'notRecorded'}
+    return {'status': record['decision'], 'source': record['source'], 'summary': record['summary'], 'reference': reference}
+
+
 def workflow(root, manifest, rows, claims, receipts, production, architecture):
     ids = {row['id'] for row in rows}
     base = {key(manifest['inventory']['source'])} | {key(value) for value in manifest.get('governingDocuments', [])}
@@ -156,7 +196,9 @@ def workflow(root, manifest, rows, claims, receipts, production, architecture):
             if finding.get('requirementID') not in covered or finding.get('returnTo') not in STAGES or STAGES.index(finding['returnTo']) > STAGES.index(stage) or not finding.get('reason'):
                 raise ValueError('Review finding lacks its owning return stage')
             requested.append(finding['returnTo'])
-        reviews.append({**review, 'reference': reference, 'bindingComplete': needed <= basis})
+        intent_complete = stage != 'requirements' or review_intent(review)
+        reviews.append({**review, 'reference': reference, 'bindingComplete': needed <= basis,
+                        'intentComplete': intent_complete})
     coverage = set()
     for row in rows:
         for identity in row['implementation']['claims']:
@@ -176,10 +218,15 @@ def workflow(root, manifest, rows, claims, receipts, production, architecture):
         reasons = []
         for review in reviews:
             if review['stage'] == stage:
-                if review['decision'] == 'passed' and review['bindingComplete']:
+                if review['decision'] == 'passed' and review['bindingComplete'] and review['intentComplete']:
                     accepted.update(review['requirements'])
                 else:
-                    reasons.append(review['summary'] if review['bindingComplete'] else 'Review omits governing inputs or checker receipts.')
+                    if not review['bindingComplete']:
+                        reasons.append('Review omits governing inputs or checker receipts.')
+                    if not review['intentComplete']:
+                        reasons.append('Resolve and record intent for every reviewed requirement.')
+                    if review['decision'] != 'passed':
+                        reasons.append(review['summary'])
         missing = sorted(ids - accepted)
         if missing:
             reasons.append('Current passed review missing for ' + str(len(missing)) + ' requirements.')
@@ -274,6 +321,7 @@ def build(root, manifest):
     edges = []
     rows = []
     groups = {}
+    claim_bindings = {}
     source = manifest['inventory']['source']['path']
     by_id = {entry['id']: entry for entry in expected}
     for requirement in requirements:
@@ -294,6 +342,7 @@ def build(root, manifest):
                 if phase == 'correspondence' and claim['outcome'] == 'passed' and claim['domain'] != 'translation.validated':
                     raise ValueError('A model proof cannot establish validated source correspondence')
                 used.append(claim['outcome'])
+                claim_bindings.setdefault(claim_id, []).append((identity, phase))
             if not references and not assessment.get('reason'):
                 raise ValueError('Uncovered requirements need an explicit reason')
             row[phase] = {'outcome': aggregate(used), 'claims': references, 'detail': assessment.get('reason', '')}
@@ -329,6 +378,41 @@ def build(root, manifest):
                           'label': str(passed) + '/' + str(len(group['requirements'])) + ' verified'})
     gates = workflow(root, manifest, rows, claims, receipts, production, architecture)
     verdict = gates['outcome']
+    acceptance = user_acceptance(root, manifest, gates['reviews'])
+    acceptance_label = {'notRecorded': 'Not recorded', 'accepted': 'Accepted', 'changesRequested': 'Changes requested'}
+    nodes.append({'id': 'user-acceptance', 'label': 'User acceptance · ' + acceptance_label[acceptance['status']],
+                  'role': 'user decision', 'details': acceptance})
+    edges.append({'id': 'acceptance-integration', 'source': 'workflow-integration', 'target': 'user-acceptance',
+                  'label': 'User review', 'directed': True})
+    for review in gates['reviews']:
+        if review['stage'] != 'requirements' or not review['bindingComplete']:
+            continue
+        for intent in review.get('intent', []):
+            identity = intent['requirementID']
+            node_id = 'intent-' + identity
+            nodes.append({'id': node_id, 'label': 'Intent · ' + identity, 'role': 'requirement intent',
+                          'details': intent})
+            edges.append({'id': node_id + '-requirement', 'source': node_id, 'target': identity,
+                          'label': 'Defines', 'directed': True})
+
+    source_nodes = set()
+    for claim_id, bound in claim_bindings.items():
+        claim = claims[claim_id]
+        node_id = 'evidence-' + hashlib.sha256(claim_id.encode()).hexdigest()
+        nodes.append({'id': node_id, 'label': claim_id, 'role': 'verification evidence', 'details': claim})
+        for identity, phase in bound:
+            edges.append({'id': node_id + '-' + identity + '-' + phase, 'source': identity, 'target': node_id,
+                          'label': phase.title(), 'directed': True})
+        if claim['outcome'] != 'passed' or claim['activity'] == 'specificationCheck':
+            continue
+        for source_input in claim['sourceInputs']:
+            source_id = 'source-' + hashlib.sha256(source_input['path'].encode()).hexdigest()
+            if source_id not in source_nodes:
+                nodes.append({'id': source_id, 'label': Path(source_input['path']).name, 'role': 'implementation source',
+                              'details': source_input})
+                source_nodes.add(source_id)
+            edges.append({'id': node_id + '-' + source_id, 'source': node_id, 'target': source_id,
+                          'label': 'Source input', 'directed': True})
     for index, stage in enumerate(gates['stages']):
         identity = 'workflow-' + stage['id']
         stage['nodeID'] = identity
@@ -340,7 +424,7 @@ def build(root, manifest):
                 'metadata': {'verificationReport': {'schemaVersion': 2, 'inventory': [entry['id'] for entry in expected],
                     'requirements': rows, 'evidence': list(claims.values()), 'receipts': receipts, 'outcome': verdict,
                     'workflow': gates, 'architectureInputs': architecture_inputs, 'productionInputs': manifest['productionInputs'],
-                    'mapBinding': manifest.get('mapBinding'), 'openQuestions': []}}}
+                    'mapBinding': manifest.get('mapBinding'), 'userAcceptance': acceptance, 'openQuestions': []}}}
     return document
 
 

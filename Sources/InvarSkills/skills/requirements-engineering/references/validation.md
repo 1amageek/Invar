@@ -23,6 +23,10 @@ Distinguish validation (right requirements), specification quality review (well-
 
 ## Decision gate
 
+Read the request, applicable specifications and relevant behavior before asking. For an unresolved interpretation, identify a scenario in which plausible answers produce different observable acceptance results. Ask the user only when the answer would change that result and the governing sources leave the choice open. State the competing outcomes and why they matter. Resolve clearly governed interpretations from their sources and proceed with delegated implementation choices within the established behavior.
+
+For each in-scope requirement, record the selected behavior, why it matches the intent, and the exact source of authority under its stable `SPEC.md` requirement ID. Keep the acceptance condition observable. Retain unanswered choices as pending, with the question and its observable consequences. Update the governing requirement before deriving formal obligations.
+
 Record each material issue as resolved, accepted by an authorized decision-maker, or open. If unresolved ambiguity affects a requirement's meaning or authorization, do not implement the affected behavior on an unsupported assumption. Continue independent authorized work where safe. A direct unambiguous request may provide sufficient authorization; do not demand redundant approval.
 
 ## Output

@@ -36,7 +36,11 @@ enum ProjectWorkflowAssessment {
                     let reason = finding["reason"] as? String, !reason.isEmpty else { throw ProjectReportAssessment.invalid("Finding lacks its owning return stage") }
                 requested.insert(target)
             }
-            if decision == "passed", complete { accepted[stage]!.formUnion(requirements) }
+            let intentComplete = stage == "requirements" ? try resolvedIntent(review, requirements: Set(requirements)) : true
+            guard review["intentComplete"] as? Bool == intentComplete else {
+                throw ProjectReportAssessment.invalid("Requirements review disagrees with its recorded intent")
+            }
+            if decision == "passed", complete, intentComplete { accepted[stage]!.formUnion(requirements) }
         }
         let phaseOutcomes = ProjectReportAssessment.phases.map { ProjectReportAssessment.aggregate(phaseValues[$0]!) }
         var evidence = Dictionary(uniqueKeysWithValues: zip(ProjectReportAssessment.phases,phaseOutcomes))
@@ -60,5 +64,26 @@ enum ProjectWorkflowAssessment {
         let result = phaseOutcomes.contains("failed") ? "failed" : allPassed ? "passed" : "incomplete"
         guard workflow["outcome"] as? String == result else { throw ProjectReportAssessment.invalid("Workflow verdict disagrees with reviewed gates") }
         return result
+    }
+
+    private static func resolvedIntent(_ review: [String:Any], requirements: Set<String>) throws -> Bool {
+        guard let value = review["intent"] else { return false }
+        guard let entries = value as? [[String:Any]] else {
+            throw ProjectReportAssessment.invalid("Invalid requirements intent")
+        }
+        var seen = Set<String>()
+        var resolved = Set<String>()
+        for entry in entries {
+            guard let id = entry["requirementID"] as? String, requirements.contains(id), seen.insert(id).inserted,
+                let basis = entry["basis"] as? String, ["request", "existingSpecification", "userDecision", "pending"].contains(basis),
+                ["decision", "rationale", "source"].allSatisfy({
+                    guard let text = entry[$0] as? String else { return false }
+                    return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }) else {
+                throw ProjectReportAssessment.invalid("Intent lacks a unique requirement, decision, rationale or authority")
+            }
+            if basis != "pending" { resolved.insert(id) }
+        }
+        return resolved == requirements
     }
 }

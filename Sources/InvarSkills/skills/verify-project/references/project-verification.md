@@ -46,6 +46,14 @@ For the implementation stage, retain the code review's comparison, inspected inp
 
 A passed review has no findings. changesRequested has at least one finding containing requirementID, returnTo and reason. The return owner must be the reviewed stage or an earlier stage. A requested revision invalidates that owning gate and blocks its dependent gates. A review is an Agent attestation over recorded inputs. Formal claims require checker receipts.
 
+## Intent and user acceptance
+
+A requirements review adds an `intent` array. Each entry has `requirementID`, `basis` (`request`, `existingSpecification`, `userDecision` or `pending`), `decision`, `rationale` and `source`. Use a locator to the governing request, specification or user decision as `source`. For `pending`, record the unresolved question as the decision and the differing observable outcomes in the rationale. Use one entry per reviewed SPEC.md ID. Exact specification and review references bind the wording and judgment. The requirements gate needs resolved entries for all covered requirements before it can use a passed review. Preserve historical reviews without intent as incomplete evidence until re-reviewed.
+
+The manifest may reference an explicit user acceptance record as `userAcceptance` using its path and SHA-256. The record contains `schemaVersion: 1`, `decision` (`accepted` or `changesRequested`), `source` (locator to the explicit user response), `summary`, and `integrationReviews` (the exact current integration review references). Save the user decision in an existing evidence directory and capture a snapshot containing it before publication. Carry forward the reviewed technical evidence when its inputs are unchanged. Without a current decision the report displays **Not recorded**. A decision bound to superseded reviews is stale and is omitted. Never infer acceptance from a passed checker, an Agent review, silence, or the original request to implement.
+
+Explorer shows intent, requirements, checked evidence and source bindings on the report Canvas. User acceptance has its own node, with an independent status and a link to the integration review gate.
+
 ## Evidence reuse after revisions
 
 Compare the actual evidence closure with the next captured inputs. Include the governing requirement, relevant production files and dependencies, harness or model, configuration, tool and applicable execution assumptions. When the closure or coverage is uncertain, recheck the affected claim. A change outside the closure can preserve the original evidence. Reuse the original bytes and path/digest references, including checker receipts and supporting outputs. Preserve their original execution context in the new review.

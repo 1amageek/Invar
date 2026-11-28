@@ -46,6 +46,15 @@ The verification daemon serves the local OS user through private Unix sockets. R
 | WG13 | When a reviewed project-local STITCH++ harness is applicable, verify-project runs its bounded component check after the affected changes are ready. Run on an isolated copy with a local Docker runtime. Retain the command, tool and image identity, execution counters and required Endpoint reachability. Findings or unavailable evidence keep the applicable review open. |
 | WG14 | Agent preparation calls the installed Invar setup entry point for the applicable verification tools and resolves the returned absolute paths before planning. Preserve explicitly pinned project versions and report unavailable prerequisites. Tool preparation and user previews can advance independently of check execution. |
 
+### Requirements intent and user acceptance
+
+| ID | Requirement | Acceptance condition |
+|---|---|---|
+| RI01 | Resolve material ambiguity before formalization | The Agent checks the request and current governing requirements. Ask the user only when the unresolved choice changes an observable acceptance result. Record the selected behavior, rationale and authority under its stable SPEC.md requirement ID. An open choice blocks the affected requirements gate and its dependent work. |
+| RI02 | Trace the judgment to verification | The published report connects the captured requirement and its recorded intent to its implementation sources and checker obligations and results. Missing intent coverage keeps the requirements gate incomplete. |
+| RI03 | Report user acceptance independently | A user acceptance record cites an explicit user decision and binds the exact current integration reviews. Show unrecorded acceptance explicitly. Acceptance does not change the technical verdict. |
+
+
 ## Architecture sequences
 
 The generate-sequences skill captures the ordered interactions of a selected use case in the project's root SEQUENCES.dsl. The scenario reuses the architecture's element and relationship IDs, identifies the governing requirements, and cites the exact project material where known. Review the specification and trace the implementation when available. Architecture Explorer owns snapshot resolution, diagnostics, presentation and evidence navigation. A declared or source-supported scenario does not establish an observed execution or a verified property.

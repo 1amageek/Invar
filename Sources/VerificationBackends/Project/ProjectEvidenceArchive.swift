@@ -10,6 +10,9 @@ enum ProjectEvidenceArchive {
             let inventory = value["inventory"] as? [String:Any], let source = inventory["source"] as? [String:Any],
             let sourcePath = source["path"] as? String, let receipts = value["receipts"] as? [[String:Any]] else { throw InvarError("INVALID_RESULT","Validated project manifest lost its receipt closure") }
         paths.insert(sourcePath)
+        if let acceptance = value["userAcceptance"] as? [String:Any], let path = acceptance["path"] as? String {
+            paths.insert(path)
+        }
         let governing = value["governingDocuments"] as? [[String:Any]] ?? []
         let architecture = value["architectureInputs"] as? [[String:Any]] ?? []
         for reference in governing + architecture {

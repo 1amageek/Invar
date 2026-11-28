@@ -17,17 +17,18 @@ import VerificationCore
         }
         let bytes = try Data(contentsOf: work.appendingPathComponent("passed.json"))
         let original = try #require(JSONSerialization.jsonObject(with: bytes) as? [String:Any])
-        for mutation in ["workflow","claims","review","return","generation","correspondence","missingArchitecture","unboundArchitecture"] {
+        for mutation in ["workflow","claims","review","return","generation","correspondence","missingArchitecture","unboundArchitecture","missingIntent"] {
             var document = original, metadata = try #require(document["metadata"] as? [String:Any])
             var report = try #require(metadata["verificationReport"] as? [String:Any])
             switch mutation {
             case "workflow": report.removeValue(forKey: "workflow")
             case "missingArchitecture": report["architectureInputs"] = [[String:Any]]()
-            case "unboundArchitecture":
+            case "unboundArchitecture", "missingIntent":
                 var workflow = try #require(report["workflow"] as? [String:Any])
                 var reviews = try #require(workflow["reviews"] as? [[String:Any]])
                 let inputs = try #require(reviews[0]["inputs"] as? [[String:Any]])
-                reviews[0]["inputs"] = inputs.filter { $0["path"] as? String != "ARCHITECTURE.dsl" }
+                if mutation == "missingIntent" { reviews[0].removeValue(forKey: "intent") }
+                else { reviews[0]["inputs"] = inputs.filter { $0["path"] as? String != "ARCHITECTURE.dsl" } }
                 workflow["reviews"] = reviews; report["workflow"] = workflow
             case "claims":
                 var rows = try #require(report["requirements"] as? [[String:Any]])

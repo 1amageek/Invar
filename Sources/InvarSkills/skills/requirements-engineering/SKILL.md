@@ -11,7 +11,7 @@ Own the meaning, validity, and revision of requirements, not implementation boun
 1. [Elicit](references/elicitation.md) stakeholder needs and sources. Reuse supplied intent findings.
 2. [Analyze](references/analysis.md) semantic conflicts, scenarios, obligations and feasibility. Identify any technical boundary or impact evidence the caller needs to supply.
 3. [Specify](references/specification.md) observable requirements and acceptance criteria.
-4. [Validate](references/validation.md) against stakeholder intent; resolve material questions before authorizing affected work.
+4. [Validate](references/validation.md) against stakeholder intent; ask the user only about unresolved choices that change an observable acceptance result. Return the decision, rationale and authority per SPEC.md requirement ID.
 5. [Manage](references/management.md) baseline revisions, provenance and traceability.
 
 ## Integration

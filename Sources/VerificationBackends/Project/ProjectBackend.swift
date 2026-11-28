@@ -90,6 +90,12 @@ public struct ProjectBackend: VerificationBackend {
                 throw InvarError("INPUT_MISMATCH", "Architecture declarations must belong to the captured workspace")
             }
         }
+        let acceptanceReference = verificationReport["userAcceptance"]["reference"]
+        if let path = acceptanceReference["path"].string {
+            guard let digest = acceptanceReference["sha256"].string, capturedDigests[path] == digest else {
+                throw InvarError("INPUT_MISMATCH", "User acceptance must belong to the captured workspace")
+            }
+        }
         let expected: Int32 = outcome == "passed" ? 0 : outcome == "failed" ? 5 : 6
         guard originalJSON != nil, originalJSON == validatedJSON, result.exitCode == expected, validation.exitCode == expected else { throw InvarError("INVALID_RESULT","Project report, receipts and process exit disagree") }
         for entry in context.job.inputs {

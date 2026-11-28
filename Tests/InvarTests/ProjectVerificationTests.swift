@@ -43,7 +43,10 @@ import VerificationStore
         reviews=[]
         for stage, evidence in [('requirements',architecture_inputs),('specification',[ref(r)])]:
             p=run/(stage+'-review.json')
-            p.write_text(json.dumps({'schemaVersion':1,'stage':stage,'requirements':['A01'],'decision':'passed','summary':'Checked fixture scope','inputs':[ref(root/'SPEC.md'),*evidence],'findings':[]}))
+            record={'schemaVersion':1,'stage':stage,'requirements':['A01'],'decision':'passed','summary':'Checked fixture scope','inputs':[ref(root/'SPEC.md'),*evidence],'findings':[]}
+            if stage=='requirements':
+                record['intent']=[{'requirementID':'A01','basis':'existingSpecification','decision':'Returns two','rationale':'The required result','source':'SPEC.md#acceptance'}]
+            p.write_text(json.dumps(record))
             reviews.append(ref(p))
         manifest={'schemaVersion':2,'title':'Fixture verification','productionInputs':production,'architectureInputs':architecture_inputs,'reviews':reviews,'inventory':{'source':ref(root/'SPEC.md'),'sections':[{'heading':'## Acceptance','kind':'table'}]},'requirements':[{'id':'A01','specification':{'claims':['spec']},'implementation':{'claims':[],'reason':'No source check'},'correspondence':{'claims':[],'reason':'No validated translation'}}],'receipts':[ref(r)]}
         m=run/'manifest.json';m.write_text(json.dumps(manifest))

@@ -52,12 +52,19 @@ class ProjectReportTests(unittest.TestCase):
     def save_receipt(self, phase='specification'):
         return self.write(phase + '-receipt.json', json.dumps(self.receipts[phase]))
 
+    def intent(self):
+        return [{'requirementID': identity, 'basis': 'existingSpecification', 'decision': 'Preserve the condition',
+                 'rationale': 'The governing requirement defines this result', 'source': 'SPEC.md#acceptance'}
+                for identity in ['R01', 'R02']]
+
     def make_reviews(self):
         self.manifest['reviews'] = []
         for stage in module.STAGES:
             architecture = self.manifest.get('architectureInputs', []) if stage in {'requirements', 'integration'} else []
             review = {'schemaVersion': 1, 'stage': stage, 'requirements': ['R01', 'R02'], 'decision': 'passed', 'summary': 'Reviewed controlled fixture scope',
                       'findings': [], 'inputs': [self.specification, *architecture, *self.manifest['productionInputs'], *self.manifest['receipts'], *self.manifest['reviews']]}
+            if stage == 'requirements':
+                review['intent'] = self.intent()
             self.manifest['reviews'].append(self.write(stage + '-review.json', json.dumps(review)))
 
     def update_receipt(self, phase='specification'):
@@ -78,6 +85,33 @@ class ProjectReportTests(unittest.TestCase):
         self.assertEqual(value['outcome'], 'passed')
         self.assertTrue(all(row[phase]['outcome'] == 'passed' for row in value['requirements'] for phase in module.PHASES))
 
+    def test_unanswered_intent_blocks_even_successful_checker_evidence(self):
+        def mark_pending(review):
+            review['intent'][0]['basis'] = 'pending'
+        self.update_review('requirements', mark_pending)
+        self.manifest['reviews'] = self.manifest['reviews'][:1]
+        workflow = self.build()['workflow']
+        self.assertEqual(workflow['returnTo'], 'requirements')
+        self.assertEqual(workflow['stages'][1]['status'], 'blocked')
+        self.assertEqual(workflow['stages'][1]['evidence'], 'passed')
+
+    def test_user_acceptance_is_independent_and_linked_to_current_reviews(self):
+        self.assertEqual(self.build()['userAcceptance']['status'], 'notRecorded')
+        record = {'schemaVersion': 1, 'decision': 'changesRequested', 'source': 'User review message',
+                  'summary': 'Revise the presented behavior', 'integrationReviews': [self.manifest['reviews'][-1]]}
+        self.manifest['userAcceptance'] = self.write('acceptance.json', json.dumps(record))
+        document = module.build(self.root, self.manifest)
+        report = document['metadata']['verificationReport']
+        self.assertEqual((report['outcome'], report['userAcceptance']['status']), ('passed', 'changesRequested'))
+        edges = {(edge['source'], edge['target']) for edge in document['edges']}
+        nodes = {node['id']: node for node in document['nodes']}
+        self.assertIn(('intent-R01', 'R01'), edges)
+        self.assertTrue(any(source == 'R01' and nodes[target]['role'] == 'verification evidence'
+                            and any(parent == target and nodes[file]['role'] == 'implementation source' for parent, file in edges)
+                            for source, target in edges))
+        self.update_review('integration', lambda review: review.update(summary='Revised integration review'))
+        self.assertEqual(self.build()['userAcceptance']['status'], 'notRecorded')
+
     def test_deferred_implementation_resumes_with_unaffected_receipts(self):
         stable_source = self.write('Stable.swift', 'func stable() -> Bool { true }')
         stable_model = self.write('stable-model.json', '{"model":"stable"}')
@@ -89,6 +123,7 @@ class ProjectReportTests(unittest.TestCase):
                 'schemaVersion': 1, 'stage': stage, 'requirements': ['R01', 'R02'],
                 'decision': 'passed', 'summary': 'Reviewed independent contracts',
                 'inputs': [self.specification, reference], 'findings': [],
+                **({'intent': self.intent()} if stage == 'requirements' else {}),
             }))
             for stage, reference in [('requirements', self.architecture), ('specification', spec_reference)]
         ]
