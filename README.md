@@ -20,6 +20,8 @@ Review each stage before proceeding. If a review finds a problem, return to the 
 
 For Swift projects, the agent runs deslop for structural checks. The workflow uses code-review to check affected behavior after structural checks and tests, before Implementation Model Verification. [Implementation review](Sources/InvarSkills/skills/verify-project/SKILL.md#review-the-implementation-behavior)
 
+Run a reviewed STITCH++ harness when an operation-order contract is ready for component verification. The runner records bounded execution evidence for the implementation review. [Component harness setup and execution](Sources/InvarSkills/skills/verify-project/references/component-stitch.md)
+
 ## Run verification from an agent
 
 Invar serves bundled skills from its stdio MCP server using the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview). Connect to `invar mcp` from a project directory. An extension-aware client discovers skills with `skills/list`, looks up entries with `skills/get`, and reads their files using `resources/read`. Each manifest includes the byte sizes and SHA-256 digests of the skill and its supporting files. Clients with standard MCP Resources can also discover the entrypoints through `resources/list`.
