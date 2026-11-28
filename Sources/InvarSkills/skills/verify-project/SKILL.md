@@ -36,7 +36,7 @@ After the applicable specification gate passes, perform the requested implementa
 
 ### Decide when to run checks
 
-For each verification item, identify its owning contract, affected scope, and the next decision that needs its result.
+For each verification item, identify its owning contract, affected scope, and the next decision that needs its result. Use [use-invar to prepare applicable tools](../use-invar/SKILL.md#prepare-verification-tools) before a check needs them. Tool preparation can run independently of a preview or deferred check.
 
 | Decision | Condition and action |
 |---|---|

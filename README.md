@@ -87,6 +87,12 @@ old_host="$(dirname "$old_invar")/Invar_invar.bundle/Contents/Resources/architec
 
 Run the new `invar` in that workspace after installation. The new pair registers again and keeps previously published results. Repeat for each workspace with running services. If your verification configuration still contains legacy `approved` fields, remove them and prepare a fresh plan from the current snapshot.
 
+## Prepare verification tools
+
+`invar setup` prepares the verification runtimes in the user's Invar tool directory and prints the executable paths and readiness as JSON. Use `--tools` to select `formal`, `deslop`, `stitch` and `formal-cli` as a comma-separated list. For a reviewed STITCH++ harness, add `--stitch-language` with the language from its configuration. Image preparation uses an installed, running local Docker engine. Explorer remains available while tools are prepared.
+
+The Formal profile supplies the pinned runtime for Invar's linked swift-formal engine and separate Java, offline TLC, Lean and Lake paths for project runners. An exact Lean release in the workspace's `lean-toolchain` selects the matching managed release for project checks. The STITCH++ profile provisions its own Python and package environment. The deslop and standalone Formal CLI profiles use Mint's isolated installation cache. The Agent prepares applicable profiles before planning the checks that consume them.
+
 ## Connect an agent to Invar MCP
 
 Invar 0.1.7 serves its bundled skills through MCP. Run `command -v invar` to get the installed executable path for the commands below. For a source checkout, run `swift build --product invar` and use the absolute path to `.build/debug/invar`. The executable and its adjacent SwiftPM bundles supply Explorer and the skills.

@@ -5,7 +5,7 @@ Run this check when the affected component is ready for review and its operation
 ## Prepare the run
 
 - Use a disposable copy of the reviewed inputs, including any sources referenced by the harness. Keep the harness, Dockerfile and local source path inside that copy. Review their production call boundary and assertion semantics. Use test data and local fixtures.
-- Use Python 3.11 or newer, a running local Docker engine and STITCH++ 0.2.0. Pin that version in `stitch.toml`. Install the CLI in a project-local environment from `stitch-fuzz==0.2.0` and prepare the required language image with the upstream `stitch setup --lang` command. Image preparation is a tooling step outside the Invar project sandbox.
+- Use a running local Docker engine and pin STITCH++ 0.2.0 in `stitch.toml`. Prepare the `stitch` setup profile for the harness language through Invar and use the returned Python and STITCH++ executable paths. Image preparation is a tooling step outside the Invar project sandbox.
 - Retrieve [the runner](../scripts/component_stitch.py) with MCP `resources/read` and verify its manifest digest. Save it outside the captured project copy. Run it in the Agent's local environment to use Docker.
 
 ## Execute and retain evidence

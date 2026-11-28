@@ -44,6 +44,7 @@ The verification daemon serves the local OS user through private Unix sockets. R
 | WG11 | The Agent reports progress in the active conversation at workflow start, when a gate passes or reopens, when evidence changes the remaining work, and at completion or a blocker. Each update identifies what has passed, what remains, and the current action when work is underway. |
 | WG12 | For each applicable check, verify-project chooses execution now, deferral, or reuse. While edits are provisional or a user-facing preview is ready for feedback, defer checks whose results are unnecessary for the next decision. Reconcile deferred checks at their owning component or integration boundary. Required evidence must be current before its gate passes. |
 | WG13 | When a reviewed project-local STITCH++ harness is applicable, verify-project runs its bounded component check after the affected changes are ready. Run on an isolated copy with a local Docker runtime. Retain the command, tool and image identity, execution counters and required Endpoint reachability. Findings or unavailable evidence keep the applicable review open. |
+| WG14 | Agent preparation calls the installed Invar setup entry point for the applicable verification tools and resolves the returned absolute paths before planning. Preserve explicitly pinned project versions and report unavailable prerequisites. Tool preparation and user previews can advance independently of check execution. |
 
 ## Architecture sequences
 

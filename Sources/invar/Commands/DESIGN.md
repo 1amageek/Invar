@@ -49,3 +49,11 @@ An explicit `--workspace` chooses that directory. Otherwise resolve the physical
 `invar` starts or reuses the bundled Explorer index and the Invar daemon, prints the absolute workspace path and opens Explorer. Its foreground browser server is independent of the verification and indexing daemons.
 
 `invar mcp` reuses the workspace daemon or starts it on demand. An explicit user stop persists until the next explicit start. Explorer owns Provider registration for its source and publication APIs.
+
+### Verification tool setup
+
+`invar setup` prepares selected verification profiles in a user-owned Invar tool directory before a plan captures its executables. The CLI emits the resolved paths and per-profile readiness as JSON. The Agent selects profiles from the reviewed verification work. A plain workspace open and a verification run have independent lifetimes and use their existing entry points.
+
+Setup serializes changes to its tool directory across processes. Prebuilt archives are verified against pinned digests before extraction. The Formal SDK owns its default runtime inventory. Preparation preserves the project's Lean version selection and provides a separate offline TLC for project workflows. Prepared tools reside outside the repository and system PATH. A local Docker engine remains a host prerequisite for language image preparation, with an explicit readiness diagnostic when unavailable.
+
+Repeated setup uses the same verified runtime and tool paths. Failed preparation reports the affected profile without accepting a partial profile as ready.

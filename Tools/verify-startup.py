@@ -218,6 +218,11 @@ with tempfile.TemporaryDirectory(prefix='invar-startup-') as temporary:
     workspace_skill.write_text('---\nname: workspace-only\ndescription: Must stay in this workspace.\n---\n')
     state = ['--state', str(root / 'state')]
     mcp = [binary, 'mcp', *state]
+    setup_root = root / 'managed-tools'
+    setup = [binary, 'setup', '--tool-root', str(setup_root)]
+    assert invoke([*setup, '--tools', 'unknown'], nested, 2)['code'] == 'INVALID_ARGUMENT'
+    assert invoke([*setup, '--tools', 'formal', '--stitch-language', 'swift'], nested, 2)['code'] == 'INVALID_ARGUMENT'
+    assert not setup_root.exists()
     assert invoke([binary, 'status', *state], root, 2)['code'] == 'WORKSPACE_REQUIRED'
     assert invoke([binary, 'daemon', 'approve', *state], nested, 2)['code'] == 'INVALID_ARGUMENT'
     assert invoke([*mcp, '--client-profile', 'legacy'], nested, 2)['code'] == 'INVALID_ARGUMENT'

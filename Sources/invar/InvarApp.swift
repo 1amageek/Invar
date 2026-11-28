@@ -52,6 +52,7 @@ struct InvarApp {
                 invar status | stop [--workspace PATH]
                 invar mcp [--workspace PATH]
                 invar daemon start | status | stop | identity [--workspace PATH]
+                \(SetupCommand.help)
                 invar capabilities | map | plan | run | report
                 """)
                 return 0
@@ -65,6 +66,17 @@ struct InvarApp {
                 let options = command == "daemon" ? Array(arguments.dropFirst()) : arguments
                 let data = try await DaemonCommand(options).execute()
                 FileHandle.standardOutput.write(data); FileHandle.standardOutput.write(Data([10])); return 0
+            }
+            if command == "setup" {
+                let options = Array(arguments.dropFirst())
+                if options == ["--help"] {
+                    print(SetupCommand.help)
+                    return 0
+                }
+                let result = try await SetupCommand.run(options)
+                FileHandle.standardOutput.write(result.0)
+                FileHandle.standardOutput.write(Data([10]))
+                return result.1
             }
             if command == "mcp" {
                 let options = try CommandOptions(arguments)
